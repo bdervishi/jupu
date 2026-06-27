@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react';
 import { ChatWidget } from './components/ChatWidget';
 import { IntakeDashboard } from './components/IntakeDashboard';
+import { FristenView } from './components/FristenView';
 import { sendIntake } from './lib/aiClient';
 import { detectLang, t } from './lib/i18n';
 import { emptyExtracted, type ChatMessage, type IntakeExtracted, type Lang } from './types';
 
 const LANGS: Lang[] = ['de', 'fr', 'it'];
 
+type Tab = 'intake' | 'fristen';
+
 export function App() {
+  const [tab, setTab] = useState<Tab>('intake');
   const [lang, setLang] = useState<Lang>('de');
   const [langLocked, setLangLocked] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -88,27 +92,36 @@ export function App() {
         </div>
       </header>
 
-      <div className="banner">{ui.demoBanner}</div>
+      <nav className="tabs">
+        <button className={tab === 'intake' ? 'tab active' : 'tab'} onClick={() => setTab('intake')}>{ui.tabIntake}</button>
+        <button className={tab === 'fristen' ? 'tab active' : 'tab'} onClick={() => setTab('fristen')}>{ui.tabFristen}</button>
+      </nav>
 
-      <main className="split">
-        <section className="pane">
-          <h2 className="pane-title">{ui.clientPanel}</h2>
-          <ChatWidget
-            ui={ui}
-            messages={shownMessages}
-            loading={loading}
-            disabled={complete}
-            onSend={handleSend}
-          />
-          {error && <p className="error">⚠ {error}</p>}
-        </section>
+      {tab === 'intake' && <div className="banner">{ui.demoBanner}</div>}
 
-        <section className="pane">
-          <h2 className="pane-title">{ui.lawyerPanel}</h2>
-          <IntakeDashboard ui={ui} data={extracted} complete={complete} />
-          <button className="restart" onClick={handleRestart}>{ui.restart}</button>
-        </section>
-      </main>
+      {tab === 'intake' ? (
+        <main className="split">
+          <section className="pane">
+            <h2 className="pane-title">{ui.clientPanel}</h2>
+            <ChatWidget
+              ui={ui}
+              messages={shownMessages}
+              loading={loading}
+              disabled={complete}
+              onSend={handleSend}
+            />
+            {error && <p className="error">⚠ {error}</p>}
+          </section>
+
+          <section className="pane">
+            <h2 className="pane-title">{ui.lawyerPanel}</h2>
+            <IntakeDashboard ui={ui} data={extracted} complete={complete} />
+            <button className="restart" onClick={handleRestart}>{ui.restart}</button>
+          </section>
+        </main>
+      ) : (
+        <main><FristenView /></main>
+      )}
     </div>
   );
 }

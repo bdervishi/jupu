@@ -3,6 +3,8 @@ import type { Lang } from '../types';
 export interface UiStrings {
   appTitle: string;
   subtitle: string;
+  tabIntake: string;
+  tabFristen: string;
   demoBanner: string;
   clientPanel: string;
   lawyerPanel: string;
@@ -33,6 +35,8 @@ const STRINGS: Record<Lang, UiStrings> = {
   de: {
     appTitle: 'AdvoOS — KI-Sekretariat',
     subtitle: 'Demo: KI-Mandatsannahme für Schweizer Kanzleien',
+    tabIntake: 'Mandatsannahme',
+    tabFristen: 'Fristenrechner',
     demoBanner: '⚠️ Demo — bitte KEINE echten oder vertraulichen Daten eingeben. Daten werden nicht dauerhaft gespeichert.',
     clientPanel: 'Mandanten-Sicht (Website-Chat)',
     lawyerPanel: 'Kanzlei-Sicht (Live-Mandatsanfrage)',
@@ -60,6 +64,8 @@ const STRINGS: Record<Lang, UiStrings> = {
   fr: {
     appTitle: 'AdvoOS — secrétariat IA',
     subtitle: 'Démo : prise de mandat par IA pour études d’avocats suisses',
+    tabIntake: 'Prise de mandat',
+    tabFristen: 'Calcul des délais',
     demoBanner: '⚠️ Démo — merci de NE PAS saisir de données réelles ou confidentielles. Aucune conservation durable.',
     clientPanel: 'Vue client (chat du site web)',
     lawyerPanel: 'Vue étude (demande de mandat en direct)',
@@ -87,6 +93,8 @@ const STRINGS: Record<Lang, UiStrings> = {
   it: {
     appTitle: 'AdvoOS — segreteria IA',
     subtitle: 'Demo: acquisizione mandati con IA per studi legali svizzeri',
+    tabIntake: 'Acquisizione mandato',
+    tabFristen: 'Calcolo termini',
     demoBanner: '⚠️ Demo — si prega di NON inserire dati reali o riservati. Nessuna conservazione permanente.',
     clientPanel: 'Vista cliente (chat del sito)',
     lawyerPanel: 'Vista studio (richiesta di mandato in tempo reale)',

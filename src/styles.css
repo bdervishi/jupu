@@ -95,3 +95,41 @@ body {
 .pill-go { background: var(--ok-soft); color: var(--ok); }
 
 .restart { margin-top: 14px; background: #475569; }
+
+/* Tabs */
+.tabs { display: flex; gap: 6px; margin: 14px 0 4px; }
+.tab {
+  background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px 8px 0 0; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.tab.active { background: #fff; color: var(--brand); border-bottom-color: #fff; }
+
+/* Formular (Fristenrechner) */
+.form { display: flex; flex-direction: column; gap: 12px; }
+.form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.form label > span { font-weight: 600; }
+.form input, .form select {
+  padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; color: var(--ink);
+}
+.form-row { display: flex; gap: 12px; align-items: flex-end; }
+.form-row .grow { flex: 1; }
+.form .check { flex-direction: row; align-items: center; gap: 8px; }
+.form .check span { font-weight: 500; }
+.hint { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
+.disclaimer { margin-top: 14px; font-size: 12px; color: var(--warn); background: var(--warn-soft); padding: 8px 10px; border-radius: 8px; }
+
+/* Frist-Ergebnis */
+.frist-result { display: flex; flex-direction: column; gap: 10px; }
+.frist-big {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--brand); color: #fff; border-radius: 12px; padding: 16px;
+}
+.frist-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; opacity: .85; }
+.frist-date { font-size: 30px; font-weight: 800; letter-spacing: .01em; }
+.frist-wd { font-size: 13px; opacity: .9; }
+.frist-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill-info { background: var(--brand-soft); color: var(--brand); }
+.frist-result h4 { margin: 8px 0 4px; font-size: 13px; color: var(--ink); }
+.steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #334155; }
+.vorfristen { margin: 0; padding-left: 18px; font-size: 13px; color: #334155; }
+.vorfristen li { margin-bottom: 3px; }

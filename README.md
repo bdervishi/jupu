@@ -10,12 +10,24 @@ strukturiertes Intake-Gespräch und erzeugt **live eine kategorisierte Mandatsan
 
 ## Was die Demo zeigt
 
+Zwei Tabs:
+
+**1. Mandatsannahme (KI-Intake-Chatbot)**
 - **Split-Screen:** links die Mandanten-Sicht (Chat-Widget), rechts die Kanzlei-Sicht
   (Mandatsanfrage, die sich live mit Rechtsgebiet, Gegenpartei, Sachverhalt, Dringlichkeit,
   Kontakt und einem **Frist-Hinweis** füllt).
 - **Mehrsprachig** DE/FR/IT mit einfacher Sprach-Autoerkennung.
 - **Anwaltsgeheimnis-Hinweis** im Gespräch + Demo-Banner (keine echten Daten).
 - **Konfliktprüfung** und **nächster Schritt (Termin)** als Platzhalter-Signale.
+
+**2. Fristenrechner (deterministische CH-Fristen-Engine)** — der eigentliche Moat
+- Berechnet prozessuale Tagesfristen **nach ZPO**, **ohne LLM** (haftungskritisch → exakt &
+  nachvollziehbar): Folgetag-Regel (Art. 142 I), Gerichtsferien/Stillstand (Art. 145 I:
+  Ostern / 15.7–15.8 / 18.12–2.1), Beginn nach Stillstand (Art. 146 I), Werktagsverschiebung
+  (Art. 142 III).
+- Zeigt **Schritt-für-Schritt-Begründung**, **Vorfristen** (14/7/3/1 Tage) und Kanton-Feiertage.
+- Vollständig client-seitig → kostenlos und offline. Engine: `src/lib/fristen.ts`,
+  getestet in `src/lib/fristen.test.ts` (`npm test`, 9 Fälle inkl. Stillstand/Verschiebung).
 
 ## Schnellstart (kostenlos, ohne KI-Key)
 
@@ -69,7 +81,15 @@ die im Konzept (`docs/concept/jupus-ch-konzept.md`, §11) beschriebene CH-souver
 Datenresidenz Schweiz, kein US-CLOUD-Act-Exposure für privilegierte Daten, DPA mit
 Berufsgeheimnis-Klausel, kein KI-Training.
 
+## Tests
+
+```bash
+npm test        # Vitest — Fristen-Engine (9 Fälle)
+npm run typecheck
+```
+
 ## Bewusst nicht enthalten (Folge-Phasen)
 
-Telefonassistent, Dokumenten-KI, **Fristen-Engine** (ZPO/StPO), eSignatur, echte Auth/DB,
+Telefonassistent, Dokumenten-KI (PDF/E-Mail-Extraktion), automatische Verknüpfung Frist↔Akte,
+StPO-/VwVG-Fristen, vollständige kantonale Feiertage, Monatsfristen, eSignatur, echte Auth/DB,
 Produktions-Compliance.
