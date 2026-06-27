@@ -10,8 +10,19 @@ const LANGS: Lang[] = ['de', 'fr', 'it'];
 
 type Tab = 'intake' | 'fristen';
 
+// Wandelt ein erkanntes Frist-Datum (z. B. "30.09.2026" / "30/9/26") in ISO um.
+function deDateToIso(s: string): string | null {
+  const m = s.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
+  if (!m) return null;
+  const d = m[1].padStart(2, '0');
+  const mo = m[2].padStart(2, '0');
+  const y = m[3].length === 2 ? `20${m[3]}` : m[3];
+  return `${y}-${mo}-${d}`;
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>('intake');
+  const [fristenPrefill, setFristenPrefill] = useState<string | undefined>(undefined);
   const [lang, setLang] = useState<Lang>('de');
   const [langLocked, setLangLocked] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -55,6 +66,12 @@ export function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleOpenFrist(datumDe: string) {
+    const iso = deDateToIso(datumDe);
+    if (iso) setFristenPrefill(iso);
+    setTab('fristen');
   }
 
   function handleRestart() {
@@ -115,12 +132,12 @@ export function App() {
 
           <section className="pane">
             <h2 className="pane-title">{ui.lawyerPanel}</h2>
-            <IntakeDashboard ui={ui} data={extracted} complete={complete} />
+            <IntakeDashboard ui={ui} data={extracted} complete={complete} onOpenFrist={handleOpenFrist} />
             <button className="restart" onClick={handleRestart}>{ui.restart}</button>
           </section>
         </main>
       ) : (
-        <main><FristenView /></main>
+        <main><FristenView prefillDate={fristenPrefill} /></main>
       )}
     </div>
   );

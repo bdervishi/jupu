@@ -87,6 +87,10 @@ body {
 .field:not(.filled) .field-value { color: #cbd5e1; }
 .field.frist.alert { background: var(--warn-soft); border-radius: 8px; padding: 8px; border-bottom: 0; }
 .field.frist.alert .field-value { color: var(--warn); font-weight: 700; }
+.link-btn {
+  margin-top: 6px; align-self: flex-start; background: none; border: 0; padding: 0;
+  color: var(--brand); font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline;
+}
 
 .meta-row { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
 .meta { display: flex; flex-direction: column; gap: 4px; }

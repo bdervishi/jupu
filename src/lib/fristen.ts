@@ -1,39 +1,72 @@
-// Fristen-Engine (CH) — deterministische Berechnung prozessualer Fristen nach ZPO.
+// Fristen-Engine (CH) — deterministische Berechnung prozessualer Fristen.
 // BEWUSST OHNE LLM: Fristen sind haftungskritisch und müssen exakt & nachvollziehbar sein.
 //
-// Abgebildete Regeln:
-//  - Art. 142 Abs. 1 ZPO: Fristbeginn am Tag NACH der Zustellung (Zustelltag zählt nicht).
-//  - Art. 142 Abs. 3 ZPO: Fällt der letzte Tag auf Sa/So/anerkannten Feiertag → nächster Werktag.
-//  - Art. 145 Abs. 1 ZPO: Stillstand (Gerichtsferien) Ostern / 15.7–15.8 / 18.12–2.1.
-//  - Art. 145 Abs. 2 ZPO: kein Stillstand im Schlichtungs-/summarischen Verfahren.
-//  - Art. 146 Abs. 1 ZPO: Zustellung während Stillstand → Beginn am 1. Tag nach Stillstand.
+// Verfahren: ZPO · StPO · VwVG · BGG. Tages- und Monatsfristen.
+// Regeln (je Verfahren mit eigenen Normen):
+//  - Fristbeginn am Tag NACH Zustellung (ZPO 142 I / StPO 90 I / VwVG 20 I / BGG 44 I).
+//  - Letzter Tag auf Sa/So/Feiertag → nächster Werktag (ZPO 142 III / StPO 90 II / VwVG 20 III / BGG 45 I).
+//  - Stillstand/Gerichtsferien Ostern · 15.7–15.8 · 18.12–2.1 (ZPO 145 / VwVG 22a / BGG 46);
+//    im StPO gibt es KEINEN Stillstand.
+//  - Zustellung während Stillstand → Beginn am 1. Tag nach Stillstand (ZPO 146 I / VwVG 22a / BGG 46).
+//  - Monatsfristen: Ablauf am Tag gleicher Zahl wie die Zustellung (ZPO 142 II), sonst Monatsende.
 //
-// Alle Berechnungen in UTC (keine Zeitzonen-/DST-Effekte). Monatsfristen sind bewusst NICHT
-// abgebildet (die meisten kritischen Fristen sind Tagesfristen); siehe Hinweis im UI.
+// Alle Berechnungen in UTC. Monatsfristen mit Stillstand sind vereinfacht (siehe Hinweise/UI).
 
-export type Kanton = 'CH' | 'ZH' | 'BE' | 'GE' | 'VD' | 'TI';
+import { addDays, ostern, utc, within } from './datelib';
+import { isFeiertag, KANTONE, type Kanton } from './feiertage';
+
+export { addDays, fmtDe, iso, ostern, utc, wochentag } from './datelib';
+export { isFeiertag } from './feiertage';
+export { KANTONE };
+export type { Kanton };
+
+export type Verfahren = 'ZPO' | 'StPO' | 'VwVG' | 'BGG';
+export type Einheit = 'Tage' | 'Monate';
+
+interface Normen { beginn: string; werktag: string; stillstand: string; nachStillstand: string; monat: string; }
+
+const NORMEN: Record<Verfahren, Normen> = {
+  ZPO: { beginn: 'Art. 142 Abs. 1 ZPO', werktag: 'Art. 142 Abs. 3 ZPO', stillstand: 'Art. 145 Abs. 1 ZPO', nachStillstand: 'Art. 146 Abs. 1 ZPO', monat: 'Art. 142 Abs. 2 ZPO' },
+  StPO: { beginn: 'Art. 90 Abs. 1 StPO', werktag: 'Art. 90 Abs. 2 StPO', stillstand: '— (kein Stillstand im StPO)', nachStillstand: '—', monat: 'Art. 90 StPO' },
+  VwVG: { beginn: 'Art. 20 Abs. 1 VwVG', werktag: 'Art. 20 Abs. 3 VwVG', stillstand: 'Art. 22a Abs. 1 VwVG', nachStillstand: 'Art. 22a Abs. 1 VwVG', monat: 'Art. 20 VwVG' },
+  BGG: { beginn: 'Art. 44 Abs. 1 BGG', werktag: 'Art. 45 Abs. 1 BGG', stillstand: 'Art. 46 Abs. 1 BGG', nachStillstand: 'Art. 46 Abs. 1 BGG', monat: 'Art. 44 BGG' },
+};
 
 export interface FristPreset {
   id: string;
   label: string;
-  dauerTage: number;
+  dauer: number;
+  einheit: Einheit;
   stillstand: boolean;
+  verfahren: Verfahren;
   grundlage: string;
 }
 
 export const PRESETS: FristPreset[] = [
-  { id: 'berufung', label: 'Berufung (ZPO 311)', dauerTage: 30, stillstand: true, grundlage: 'Art. 311 Abs. 1 ZPO' },
-  { id: 'beschwerde30', label: 'Beschwerde (ZPO 321 Abs. 1)', dauerTage: 30, stillstand: true, grundlage: 'Art. 321 Abs. 1 ZPO' },
-  { id: 'beschwerde10', label: 'Beschwerde prozessleitend / summarisch (ZPO 321 Abs. 2)', dauerTage: 10, stillstand: false, grundlage: 'Art. 321 Abs. 2 ZPO' },
-  { id: 'bgg', label: 'Beschwerde ans Bundesgericht (BGG 100)', dauerTage: 30, stillstand: true, grundlage: 'Art. 100 Abs. 1 BGG' },
-  { id: 'summarisch10', label: 'Summarisches Verfahren — Frist (kein Stillstand)', dauerTage: 10, stillstand: false, grundlage: 'Art. 145 Abs. 2 lit. b ZPO' },
+  // ZPO
+  { id: 'zpo_berufung', label: 'Berufung', dauer: 30, einheit: 'Tage', stillstand: true, verfahren: 'ZPO', grundlage: 'Art. 311 Abs. 1 ZPO' },
+  { id: 'zpo_beschwerde30', label: 'Beschwerde', dauer: 30, einheit: 'Tage', stillstand: true, verfahren: 'ZPO', grundlage: 'Art. 321 Abs. 1 ZPO' },
+  { id: 'zpo_beschwerde10', label: 'Beschwerde (prozessleitend / summarisch)', dauer: 10, einheit: 'Tage', stillstand: false, verfahren: 'ZPO', grundlage: 'Art. 321 Abs. 2 ZPO' },
+  { id: 'zpo_kuendigung', label: 'Anfechtung Kündigung Miete (Schlichtung, kein Stillstand)', dauer: 30, einheit: 'Tage', stillstand: false, verfahren: 'ZPO', grundlage: 'Art. 273 OR · Art. 145 Abs. 2 lit. a ZPO' },
+  { id: 'zpo_klage', label: 'Klage nach Klagebewilligung', dauer: 3, einheit: 'Monate', stillstand: true, verfahren: 'ZPO', grundlage: 'Art. 209 Abs. 3 ZPO' },
+  // StPO (kein Stillstand)
+  { id: 'stpo_einsprache', label: 'Einsprache gegen Strafbefehl', dauer: 10, einheit: 'Tage', stillstand: false, verfahren: 'StPO', grundlage: 'Art. 354 Abs. 1 StPO' },
+  { id: 'stpo_beschwerde', label: 'Beschwerde', dauer: 10, einheit: 'Tage', stillstand: false, verfahren: 'StPO', grundlage: 'Art. 396 Abs. 1 StPO' },
+  { id: 'stpo_berufung_anm', label: 'Berufung anmelden', dauer: 10, einheit: 'Tage', stillstand: false, verfahren: 'StPO', grundlage: 'Art. 399 Abs. 1 StPO' },
+  { id: 'stpo_berufung_erkl', label: 'Berufungserklärung', dauer: 20, einheit: 'Tage', stillstand: false, verfahren: 'StPO', grundlage: 'Art. 399 Abs. 3 StPO' },
+  // VwVG (Stillstand nach Art. 22a)
+  { id: 'vwvg_beschwerde', label: 'Beschwerde (Bundesverwaltung)', dauer: 30, einheit: 'Tage', stillstand: true, verfahren: 'VwVG', grundlage: 'Art. 50 Abs. 1 VwVG' },
+  // BGG
+  { id: 'bgg_beschwerde', label: 'Beschwerde ans Bundesgericht', dauer: 30, einheit: 'Tage', stillstand: true, verfahren: 'BGG', grundlage: 'Art. 100 Abs. 1 BGG' },
 ];
 
 export interface FristInput {
   zustellung: Date;
-  dauerTage: number;
+  dauer: number;
+  einheit: Einheit;
   stillstandAnwendbar: boolean;
   kanton: Kanton;
+  verfahren: Verfahren;
 }
 
 export interface FristResult {
@@ -42,59 +75,12 @@ export interface FristResult {
   ende: Date;
   stillstandTage: number;
   werktagVerschiebung: boolean;
+  monatsregel: boolean;
   schritte: string[];
   vorfristen: { tage: number; datum: Date }[];
 }
 
-// --- Datums-Helfer (UTC) ---------------------------------------------------
-
-const DAY = 86_400_000;
-const WOCHENTAG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-
-export function utc(y: number, m1: number, d: number): Date {
-  return new Date(Date.UTC(y, m1 - 1, d));
-}
-export function addDays(d: Date, n: number): Date {
-  return new Date(d.getTime() + n * DAY);
-}
-export function iso(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-export function fmtDe(d: Date): string {
-  return `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')}.${d.getUTCFullYear()}`;
-}
-export function wochentag(d: Date): string {
-  return WOCHENTAG[d.getUTCDay()];
-}
-function isWeekend(d: Date): boolean {
-  const wd = d.getUTCDay();
-  return wd === 0 || wd === 6;
-}
-function within(d: Date, start: Date, end: Date): boolean {
-  return d.getTime() >= start.getTime() && d.getTime() <= end.getTime();
-}
-
-// --- Ostern (Meeus/Jones/Butcher, gregorianisch) ---------------------------
-
-export function ostern(year: number): Date {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31); // 3=März, 4=April
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return utc(year, month, day);
-}
-
-// --- Gerichtsferien / Stillstand (Art. 145 Abs. 1) -------------------------
+// --- Stillstand / Gerichtsferien -------------------------------------------
 
 interface Period { start: Date; end: Date; label: string; }
 
@@ -107,7 +93,6 @@ function stillstandPeriods(year: number): Period[] {
   ];
 }
 
-/** Liefert die Stillstand-Periode, in die `d` fällt, sonst null. */
 export function inStillstand(d: Date): Period | null {
   const y = d.getUTCFullYear();
   for (const yr of [y - 1, y, y + 1]) {
@@ -118,89 +103,101 @@ export function inStillstand(d: Date): Period | null {
   return null;
 }
 
-// --- Feiertage (Art. 142 Abs. 3) -------------------------------------------
-// Baseline (deutschsprachige Kantone). Kantonale Feinheiten sind im Prototyp
-// vereinfacht und im UI als solche gekennzeichnet.
-
-export function isFeiertag(d: Date, kanton: Kanton): boolean {
-  const y = d.getUTCFullYear();
-  const e = ostern(y);
-  const set = new Set<number>([
-    utc(y, 1, 1).getTime(), // Neujahr
-    addDays(e, -2).getTime(), // Karfreitag
-    addDays(e, 1).getTime(), // Ostermontag
-    addDays(e, 39).getTime(), // Auffahrt
-    addDays(e, 50).getTime(), // Pfingstmontag
-    utc(y, 8, 1).getTime(), // Bundesfeier
-    utc(y, 12, 25).getTime(), // Weihnachten
-    utc(y, 12, 26).getTime(), // Stephanstag
-  ]);
-  if (kanton === 'ZH' || kanton === 'BE') set.add(utc(y, 1, 2).getTime()); // Berchtoldstag
-  return set.has(d.getTime());
+function countStillstand(a: Date, b: Date): number {
+  let n = 0;
+  for (let d = a; d.getTime() <= b.getTime(); d = addDays(d, 1)) {
+    if (inStillstand(d)) n++;
+  }
+  return n;
 }
 
+function isWeekend(d: Date): boolean {
+  const wd = d.getUTCDay();
+  return wd === 0 || wd === 6;
+}
 function nextWerktag(d: Date, kanton: Kanton): Date {
   let cur = d;
   while (isWeekend(cur) || isFeiertag(cur, kanton)) cur = addDays(cur, 1);
   return cur;
 }
+const WT = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+const de = (d: Date) => `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')}.${d.getUTCFullYear()}`;
+
+// Monatsfrist: Tag gleicher Zahl wie Zustellung, +N Monate; fehlt der Tag → Monatsende.
+function plusMonate(base: Date, monate: number): Date {
+  const total = base.getUTCMonth() + monate;
+  const ty = base.getUTCFullYear() + Math.floor(total / 12);
+  const tm = ((total % 12) + 12) % 12;
+  const letzterTag = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate();
+  return utc(ty, tm + 1, Math.min(base.getUTCDate(), letzterTag));
+}
 
 // --- Kernberechnung --------------------------------------------------------
 
 export function computeFrist(input: FristInput): FristResult {
-  const { zustellung, dauerTage, stillstandAnwendbar, kanton } = input;
+  const { zustellung, dauer, einheit, stillstandAnwendbar, kanton, verfahren } = input;
+  const N = NORMEN[verfahren];
   const schritte: string[] = [];
+  const stillstand = stillstandAnwendbar && verfahren !== 'StPO';
 
   let start = addDays(zustellung, 1);
-  schritte.push(
-    `Zustellung am ${fmtDe(zustellung)} (${wochentag(zustellung)}) zählt nicht — Fristbeginn am Folgetag ${fmtDe(start)} (Art. 142 Abs. 1 ZPO).`,
-  );
+  schritte.push(`Zustellung am ${de(zustellung)} (${WT[zustellung.getUTCDay()]}) zählt nicht — Fristbeginn am Folgetag ${de(start)} (${N.beginn}).`);
 
-  if (stillstandAnwendbar) {
+  if (stillstand) {
     const p = inStillstand(start);
     if (p) {
       const neu = addDays(p.end, 1);
-      schritte.push(
-        `Fristbeginn fällt in die ${p.label} (Stillstand ${fmtDe(p.start)}–${fmtDe(p.end)}); Frist beginnt am ${fmtDe(neu)} (Art. 146 Abs. 1 ZPO).`,
-      );
+      schritte.push(`Fristbeginn fällt in die ${p.label} (Stillstand ${de(p.start)}–${de(p.end)}); Frist beginnt am ${de(neu)} (${N.nachStillstand}).`);
       start = neu;
     }
   }
 
-  let d = start;
-  let counted = 0;
+  let endeRoh: Date;
   let stillstandTage = 0;
-  for (;;) {
-    const inS = stillstandAnwendbar ? inStillstand(d) : null;
-    if (inS) {
-      stillstandTage++;
-    } else {
-      counted++;
-      if (counted === dauerTage) break;
-    }
-    d = addDays(d, 1);
-  }
-  const endeRoh = d;
+  const monatsregel = einheit === 'Monate';
 
-  if (stillstandTage > 0) {
-    schritte.push(
-      `${dauerTage} Tage Frist; ${stillstandTage} Tag(e) Gerichtsferien werden nicht mitgezählt (Art. 145 Abs. 1 ZPO) — rechnerischer Ablauf am ${fmtDe(endeRoh)}.`,
-    );
+  if (monatsregel) {
+    const nominal = plusMonate(zustellung, dauer);
+    schritte.push(`Monatsfrist: Ablauf am Tag gleicher Zahl wie die Zustellung — rechnerisch ${de(nominal)} (${N.monat}).`);
+    endeRoh = nominal;
+    if (stillstand) {
+      for (let guard = 0; guard < 6; guard++) {
+        const neu = addDays(nominal, countStillstand(start, endeRoh));
+        if (neu.getTime() === endeRoh.getTime()) break;
+        endeRoh = neu;
+      }
+      stillstandTage = countStillstand(start, endeRoh);
+      if (stillstandTage > 0) {
+        schritte.push(`${stillstandTage} Tag(e) Gerichtsferien werden hinzugerechnet (${N.stillstand}; Monatsfrist + Stillstand vereinfacht) — ${de(endeRoh)}.`);
+      }
+    }
   } else {
-    schritte.push(
-      `${dauerTage} Tage Frist ohne Stillstand — rechnerischer Ablauf am ${fmtDe(endeRoh)} (${wochentag(endeRoh)}).`,
-    );
+    let d = start;
+    let counted = 0;
+    for (;;) {
+      if (stillstand && inStillstand(d)) {
+        stillstandTage++;
+      } else {
+        counted++;
+        if (counted === dauer) break;
+      }
+      d = addDays(d, 1);
+    }
+    endeRoh = d;
+    if (stillstandTage > 0) {
+      schritte.push(`${dauer} Tage Frist; ${stillstandTage} Tag(e) Gerichtsferien nicht mitgezählt (${N.stillstand}) — rechnerischer Ablauf am ${de(endeRoh)}.`);
+    } else {
+      schritte.push(`${dauer} Tage Frist${verfahren === 'StPO' ? ' (kein Stillstand im StPO)' : ' ohne Stillstand'} — rechnerischer Ablauf am ${de(endeRoh)} (${WT[endeRoh.getUTCDay()]}).`);
+    }
   }
 
   const ende = nextWerktag(endeRoh, kanton);
   const werktagVerschiebung = ende.getTime() !== endeRoh.getTime();
   if (werktagVerschiebung) {
-    schritte.push(
-      `Letzter Tag ${fmtDe(endeRoh)} ist ${wochentag(endeRoh)}/Feiertag — Ablauf verschoben auf den nächsten Werktag ${fmtDe(ende)} (Art. 142 Abs. 3 ZPO).`,
-    );
+    schritte.push(`Letzter Tag ${de(endeRoh)} ist ${WT[endeRoh.getUTCDay()]}/Feiertag — Ablauf verschoben auf den nächsten Werktag ${de(ende)} (${N.werktag}).`);
   }
 
   const vorfristen = [14, 7, 3, 1].map((tage) => ({ tage, datum: addDays(ende, -tage) }));
 
-  return { start, endeRoh, ende, stillstandTage, werktagVerschiebung, schritte, vorfristen };
+  return { start, endeRoh, ende, stillstandTage, werktagVerschiebung, monatsregel, schritte, vorfristen };
 }

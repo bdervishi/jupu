@@ -21,13 +21,19 @@ Zwei Tabs:
 - **Konfliktprüfung** und **nächster Schritt (Termin)** als Platzhalter-Signale.
 
 **2. Fristenrechner (deterministische CH-Fristen-Engine)** — der eigentliche Moat
-- Berechnet prozessuale Tagesfristen **nach ZPO**, **ohne LLM** (haftungskritisch → exakt &
-  nachvollziehbar): Folgetag-Regel (Art. 142 I), Gerichtsferien/Stillstand (Art. 145 I:
-  Ostern / 15.7–15.8 / 18.12–2.1), Beginn nach Stillstand (Art. 146 I), Werktagsverschiebung
-  (Art. 142 III).
-- Zeigt **Schritt-für-Schritt-Begründung**, **Vorfristen** (14/7/3/1 Tage) und Kanton-Feiertage.
-- Vollständig client-seitig → kostenlos und offline. Engine: `src/lib/fristen.ts`,
-  getestet in `src/lib/fristen.test.ts` (`npm test`, 9 Fälle inkl. Stillstand/Verschiebung).
+- Berechnet prozessuale Fristen **ohne LLM** (haftungskritisch → exakt & nachvollziehbar) für
+  **ZPO · StPO · VwVG · BGG**, **Tages- und Monatsfristen**:
+  - Folgetag-Regel (ZPO 142 I / StPO 90 I / VwVG 20 I / BGG 44 I)
+  - Gerichtsferien/Stillstand (ZPO 145 / VwVG 22a / BGG 46: Ostern / 15.7–15.8 / 18.12–2.1) —
+    im **StPO kein Stillstand**
+  - Beginn nach Stillstand (ZPO 146 I) · Werktagsverschiebung (ZPO 142 III) · Monatsende-Regel (142 II)
+- **Vollständige kantonale Feiertage** aller 26 Kantone (`src/lib/feiertage.ts`, inkl. beweglicher
+  Feiertage wie Näfelser Fahrt, Jeûne genevois, Lundi du Jeûne).
+- Zeigt **Schritt-für-Schritt-Begründung mit Normzitaten**, **Vorfristen** (14/7/3/1 Tage).
+- **Direkt aus dem Chatbot:** Erkennt der Intake eine Frist, öffnet ein Klick den Rechner mit
+  vorbefülltem Zustelldatum.
+- Vollständig client-seitig → kostenlos und offline. Engine: `src/lib/fristen.ts` +
+  `src/lib/feiertage.ts`, getestet in `src/lib/fristen.test.ts` (`npm test`, 14 Fälle).
 
 ## Schnellstart (kostenlos, ohne KI-Key)
 
@@ -90,6 +96,6 @@ npm run typecheck
 
 ## Bewusst nicht enthalten (Folge-Phasen)
 
-Telefonassistent, Dokumenten-KI (PDF/E-Mail-Extraktion), automatische Verknüpfung Frist↔Akte,
-StPO-/VwVG-Fristen, vollständige kantonale Feiertage, Monatsfristen, eSignatur, echte Auth/DB,
+Telefonassistent, Dokumenten-KI (PDF/E-Mail-Extraktion), automatische Verknüpfung Frist↔Akte/
+Kalender, innerkantonale (regionale) Feiertagsunterschiede, eSignatur, echte Auth/DB,
 Produktions-Compliance.

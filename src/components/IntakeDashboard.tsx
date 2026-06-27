@@ -5,6 +5,7 @@ interface Props {
   ui: UiStrings;
   data: IntakeExtracted;
   complete: boolean;
+  onOpenFrist?: (datumDe: string) => void;
 }
 
 function Field({ label, value, fallback }: { label: string; value: string; fallback: string }) {
@@ -17,7 +18,7 @@ function Field({ label, value, fallback }: { label: string; value: string; fallb
   );
 }
 
-export function IntakeDashboard({ ui, data, complete }: Props) {
+export function IntakeDashboard({ ui, data, complete, onOpenFrist }: Props) {
   return (
     <div className={`dashboard ${complete ? 'done' : ''}`}>
       <div className="card-head">
@@ -38,6 +39,11 @@ export function IntakeDashboard({ ui, data, complete }: Props) {
             ? `${data.fristHinweis.datum ? data.fristHinweis.datum + ' · ' : ''}${data.fristHinweis.hinweis}`
             : ui.notYet}
         </span>
+        {data.fristHinweis?.datum && onOpenFrist && (
+          <button className="link-btn" onClick={() => onOpenFrist(data.fristHinweis!.datum)}>
+            {ui.openInFristen}
+          </button>
+        )}
       </div>
 
       <div className="meta-row">

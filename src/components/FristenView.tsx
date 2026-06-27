@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { computeFrist, fmtDe, PRESETS, utc, wochentag, type Kanton } from '../lib/fristen';
-
-const KANTONE: Kanton[] = ['ZH', 'BE', 'GE', 'VD', 'TI', 'CH'];
+import { useEffect, useMemo, useState } from 'react';
+import {
+  computeFrist, fmtDe, KANTONE, PRESETS, utc, wochentag,
+  type Einheit, type Kanton, type Verfahren,
+} from '../lib/fristen';
 
 function parseDate(s: string) {
   const [y, m, d] = s.split('-').map(Number);
@@ -9,12 +10,21 @@ function parseDate(s: string) {
   return utc(y, m, d);
 }
 
-export function FristenView() {
-  const [dateStr, setDateStr] = useState('2026-07-02');
+const VERFAHREN: Verfahren[] = ['ZPO', 'StPO', 'VwVG', 'BGG'];
+
+export function FristenView({ prefillDate }: { prefillDate?: string }) {
+  const [dateStr, setDateStr] = useState(prefillDate || '2026-07-02');
   const [presetId, setPresetId] = useState(PRESETS[0].id);
-  const [customTage, setCustomTage] = useState(20);
+  const [customDauer, setCustomDauer] = useState(20);
+  const [customEinheit, setCustomEinheit] = useState<Einheit>('Tage');
   const [customStillstand, setCustomStillstand] = useState(true);
+  const [customVerfahren, setCustomVerfahren] = useState<Verfahren>('ZPO');
   const [kanton, setKanton] = useState<Kanton>('ZH');
+
+  // Wird der Frist-Hinweis aus dem Chatbot übergeben, Datum übernehmen.
+  useEffect(() => {
+    if (prefillDate) setDateStr(prefillDate);
+  }, [prefillDate]);
 
   const isCustom = presetId === 'custom';
   const preset = PRESETS.find((p) => p.id === presetId);
@@ -22,10 +32,17 @@ export function FristenView() {
   const result = useMemo(() => {
     const z = parseDate(dateStr);
     if (!z) return null;
-    const dauerTage = isCustom ? Math.max(1, customTage) : preset!.dauerTage;
-    const stillstandAnwendbar = isCustom ? customStillstand : preset!.stillstand;
-    return computeFrist({ zustellung: z, dauerTage, stillstandAnwendbar, kanton });
-  }, [dateStr, presetId, customTage, customStillstand, kanton, isCustom, preset]);
+    return computeFrist({
+      zustellung: z,
+      dauer: isCustom ? Math.max(1, customDauer) : preset!.dauer,
+      einheit: isCustom ? customEinheit : preset!.einheit,
+      stillstandAnwendbar: isCustom ? customStillstand : preset!.stillstand,
+      verfahren: isCustom ? customVerfahren : preset!.verfahren,
+      kanton,
+    });
+  }, [dateStr, presetId, customDauer, customEinheit, customStillstand, customVerfahren, kanton, isCustom, preset]);
+
+  const grouped = VERFAHREN.map((v) => ({ v, items: PRESETS.filter((p) => p.verfahren === v) }));
 
   return (
     <div className="split">
@@ -40,24 +57,45 @@ export function FristenView() {
           <label>
             <span>Verfahren / Fristtyp</span>
             <select value={presetId} onChange={(e) => setPresetId(e.target.value)}>
-              {PRESETS.map((p) => (
-                <option key={p.id} value={p.id}>{p.label} — {p.dauerTage} Tage</option>
+              {grouped.map(({ v, items }) => (
+                <optgroup key={v} label={v}>
+                  {items.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label} — {p.dauer} {p.einheit}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
               <option value="custom">Eigene Frist …</option>
             </select>
           </label>
 
           {isCustom && (
-            <div className="form-row">
-              <label className="grow">
-                <span>Dauer (Tage)</span>
-                <input type="number" min={1} value={customTage} onChange={(e) => setCustomTage(Number(e.target.value))} />
-              </label>
+            <>
+              <div className="form-row">
+                <label className="grow">
+                  <span>Dauer</span>
+                  <input type="number" min={1} value={customDauer} onChange={(e) => setCustomDauer(Number(e.target.value))} />
+                </label>
+                <label className="grow">
+                  <span>Einheit</span>
+                  <select value={customEinheit} onChange={(e) => setCustomEinheit(e.target.value as Einheit)}>
+                    <option value="Tage">Tage</option>
+                    <option value="Monate">Monate</option>
+                  </select>
+                </label>
+                <label className="grow">
+                  <span>Verfahren</span>
+                  <select value={customVerfahren} onChange={(e) => setCustomVerfahren(e.target.value as Verfahren)}>
+                    {VERFAHREN.map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </label>
+              </div>
               <label className="check">
                 <input type="checkbox" checked={customStillstand} onChange={(e) => setCustomStillstand(e.target.checked)} />
-                <span>Gerichtsferien (Art. 145 ZPO) anwendbar</span>
+                <span>Gerichtsferien / Stillstand anwendbar (im StPO nie)</span>
               </label>
-            </div>
+            </>
           )}
 
           <label>
@@ -68,13 +106,15 @@ export function FristenView() {
           </label>
 
           {!isCustom && preset && (
-            <p className="hint">Grundlage: {preset.grundlage} · Gerichtsferien {preset.stillstand ? 'anwendbar' : 'nicht anwendbar'}</p>
+            <p className="hint">
+              {preset.verfahren} · Grundlage: {preset.grundlage} · Gerichtsferien {preset.stillstand ? 'anwendbar' : 'nicht anwendbar'}
+            </p>
           )}
         </div>
 
         <p className="disclaimer">
-          ⚠️ Prototyp — Ergebnis stets anwaltlich prüfen. Tagesfristen nach ZPO sind abgebildet;
-          Monatsfristen und kantonale Feiertage sind vereinfacht.
+          ⚠️ Prototyp — Ergebnis stets anwaltlich prüfen. Tages- und Monatsfristen sind abgebildet;
+          Monatsfristen mit Stillstand und kantonale Feiertage sind vereinfacht.
         </p>
       </section>
 
@@ -89,6 +129,7 @@ export function FristenView() {
             </div>
 
             <div className="frist-tags">
+              {result.monatsregel && <span className="pill pill-info">Monatsfrist</span>}
               {result.stillstandTage > 0 && <span className="pill pill-info">+{result.stillstandTage} Tage Gerichtsferien</span>}
               {result.werktagVerschiebung && <span className="pill pill-info">auf Werktag verschoben</span>}
               <span className="pill pill-pending">Beginn {fmtDe(result.start)}</span>

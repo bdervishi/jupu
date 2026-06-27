@@ -29,6 +29,7 @@ export interface UiStrings {
   completeTitle: string;
   mockBadge: string;
   aiBadge: string;
+  openInFristen: string;
 }
 
 const STRINGS: Record<Lang, UiStrings> = {
@@ -60,6 +61,7 @@ const STRINGS: Record<Lang, UiStrings> = {
     completeTitle: '✓ Anfrage vollständig erfasst',
     mockBadge: 'Mock-Modus (offline, gratis)',
     aiBadge: 'Schweizer KI aktiv',
+    openInFristen: '→ Im Fristenrechner öffnen',
   },
   fr: {
     appTitle: 'AdvoOS — secrétariat IA',
@@ -89,6 +91,7 @@ const STRINGS: Record<Lang, UiStrings> = {
     completeTitle: '✓ Demande complète',
     mockBadge: 'Mode démo (hors ligne, gratuit)',
     aiBadge: 'IA suisse active',
+    openInFristen: '→ Ouvrir dans le calcul des délais',
   },
   it: {
     appTitle: 'AdvoOS — segreteria IA',
@@ -118,6 +121,7 @@ const STRINGS: Record<Lang, UiStrings> = {
     completeTitle: '✓ Richiesta completa',
     mockBadge: 'Modalità demo (offline, gratis)',
     aiBadge: 'IA svizzera attiva',
+    openInFristen: '→ Apri nel calcolo termini',
   },
 };
 
