@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AdvoOS — Avatar-Sekretärin (Phase-1-Demo)</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 20px; }
+    h1 { font-size: 18px; }
+    .avatar { width: 260px; height: 260px; margin: 0 auto; border-radius: 16px;
+      background: radial-gradient(circle at 50% 40%, #334155, #0f172a); display: flex;
+      align-items: center; justify-content: center; font-size: 64px; transition: box-shadow .2s; }
+    .avatar.speaking { box-shadow: 0 0 0 4px #22c55e; }
+    .state { text-align: center; color: #94a3b8; font-size: 13px; margin: 8px 0 16px; }
+    .log { background: #1e293b; border-radius: 10px; padding: 12px; height: 200px; overflow-y: auto; font-size: 14px; }
+    .row { display: flex; gap: 8px; margin-top: 12px; }
+    input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0b1220; color: #e2e8f0; }
+    button { padding: 10px 16px; border: 0; border-radius: 8px; background: #1e3a8a; color: #fff; font-weight: 600; cursor: pointer; }
+    button.warn { background: #b45309; }
+    .banner { background: #92400e; color: #fde68a; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>AdvoOS — Avatar-Sekretärin</h1>
+    <div class="banner">Phase-1-Demo (WebSocket, Mock-Modus). Sprache/Avatar folgen in Phase 2/3. Keine echten Daten eingeben.</div>
+    <div class="avatar" id="avatar">🧑‍💼</div>
+    <div class="state" id="state">verbinde …</div>
+    <div class="log" id="log"></div>
+    <div class="row">
+      <input id="text" placeholder="Nachricht an die Sekretärin …" autocomplete="off" />
+      <button id="send">Senden</button>
+      <button id="barge" class="warn">Unterbrechen</button>
+    </div>
+  </div>
+  <script>
+    const log = document.getElementById('log');
+    const stateEl = document.getElementById('state');
+    const avatar = document.getElementById('avatar');
+    const audioQueue = [];
+    let playing = false;
+
+    function add(msg) { const d = document.createElement('div'); d.textContent = msg; log.appendChild(d); log.scrollTop = log.scrollHeight; }
+
+    const ws = new WebSocket(`ws://${location.host}/ws`);
+    ws.onopen = () => stateEl.textContent = 'bereit';
+    ws.onclose = () => stateEl.textContent = 'Verbindung getrennt';
+    ws.onmessage = (ev) => {
+      const m = JSON.parse(ev.data);
+      if (m.type === 'state') { stateEl.textContent = m.state; avatar.classList.toggle('speaking', m.state === 'thinking'); if (m.state === 'interrupted') { audioQueue.length = 0; } }
+      else if (m.type === 'sentence') add('🧑‍💼 ' + m.text);
+      else if (m.type === 'audio') enqueueAudio(m);
+      else if (m.type === 'error') add('⚠ ' + m.message);
+    };
+
+    function enqueueAudio(m) {
+      const bytes = Uint8Array.from(atob(m.wav_b64), c => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+      audioQueue.push(url); playNext();
+    }
+    function playNext() {
+      if (playing || !audioQueue.length) return;
+      playing = true; avatar.classList.add('speaking');
+      const audio = new Audio(audioQueue.shift());
+      audio.onended = () => { playing = false; avatar.classList.toggle('speaking', audioQueue.length > 0); playNext(); };
+      audio.play().catch(() => { playing = false; });
+    }
+
+    function send() {
+      const t = document.getElementById('text');
+      if (!t.value.trim()) return;
+      add('🧑 ' + t.value);
+      ws.send(JSON.stringify({ type: 'text', text: t.value }));
+      t.value = '';
+    }
+    document.getElementById('send').onclick = send;
+    document.getElementById('text').addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+    document.getElementById('barge').onclick = () => { audioQueue.length = 0; ws.send(JSON.stringify({ type: 'barge_in' })); };
+  </script>
+</body>
+</html>

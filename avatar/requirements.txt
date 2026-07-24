@@ -1,0 +1,14 @@
+# --- Kern (Mock-Modus lauffähig) ---
+fastapi>=0.110
+uvicorn[standard]>=0.29
+httpx>=0.27              # LLM-Streaming (Hermes/vLLM, OpenAI-kompatibel)
+
+# --- Reale Modelle (bei Bedarf einkommentieren, brauchen GPU/Gewichte) ---
+# faster-whisper>=1.0    # STT
+# silero-vad             # VAD / End-of-Turn
+# piper-tts>=1.2         # TTS DE/FR/IT (Standard)  — Kokoro kann kein Deutsch!
+# numpy
+# aiortc>=1.9            # WebRTC-Transport (Phase 3)
+#
+# MuseTalk (Avatar) wird separat installiert (Repo + Gewichte), siehe README.
+# vLLM (Hermes) läuft als eigener Container/Service, siehe docker-compose.yml.
