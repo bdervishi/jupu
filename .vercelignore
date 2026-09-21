@@ -1,0 +1,5 @@
+# Vercel baut nur den React-Intake-MVP + api/. Der Rest gehört nicht in den Build.
+avatar/          # Python/GPU/WebSocket-Avatar-Server → GPU-VM, NICHT Vercel
+docs/            # Konzept- und Planungsdokumente
+scripts/         # lokale Helfer-Scripts (Lift-out)
+**/*.test.ts     # Tests
