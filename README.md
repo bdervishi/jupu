@@ -88,7 +88,8 @@ Details: [`avatar/README.md`](avatar/README.md) · Architektur/Plan:
 ## Tests
 
 ```bash
-npm test          # Vitest — Fristen-Engine (14 Fälle)
+npm test          # Vitest — Fristen-Engine + API-Kern (18 Fälle)
+npm run smoke -- <URL>   # Post-Deploy-Smoke-Test (Startseite + /api/chat)
 npm run typecheck
 ```
 

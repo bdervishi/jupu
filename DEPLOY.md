@@ -27,9 +27,33 @@ Dieses Repo ist die Wurzel des AdvoOS-Projekts. Es enthält zwei getrennt deploy
 
 ### Verifizieren
 
-- Vercel-URL öffnen → Chatbot antwortet (Mock oder echt, je nach Env-Vars).
-- `/api/chat` per POST erreichbar (die App ruft es automatisch auf).
-- Fristenrechner-Tab liefert Berechnungen (rein clientseitig, keine Keys nötig).
+Nach dem Deploy (oder lokal gegen `npm run dev`) den Smoke-Test laufen lassen:
+
+```bash
+npm run smoke -- https://<projekt>.vercel.app
+```
+
+Er prüft: Startseite lädt, `GET /api/chat` → 405, `POST /api/chat` ohne Body → 400,
+`POST /api/chat` mit Testanfrage → 200 inkl. erkanntem Frist-Hinweis, und zeigt an, ob der
+Server im **Mock-Modus** (kein `AI_API_KEY`) oder mit **echter CH-KI** antwortet.
+
+Manuell: Vercel-URL öffnen → Chatbot antwortet; Fristenrechner-Tab liefert Berechnungen
+(rein clientseitig, keine Keys nötig).
+
+### Was die Konfiguration abdeckt (Stand 2026-09-22, lokal verifiziert)
+
+| Prüfung | Ergebnis |
+|---|---|
+| `npm run build` (Vite → `dist/`) | grün |
+| `npm run typecheck` / `npm test` (18 Tests, inkl. `api/_core.test.ts`) | grün |
+| `api/chat.ts` standalone gebündelt (esbuild, wie Vercels Node-Builder) | grün, keine offenen Imports; `api/_core.ts` wird wegen `_`-Präfix nicht als eigene Function deployt |
+| `/api/chat` hinter statischem `dist/` (Vercel-Laufzeit simuliert) | 405 / 400 / 200 wie erwartet |
+| Browser-Durchstich (Chromium): Chat → Frist erkannt → Fristenrechner → Ablauf + Vorfristen | grün |
+| Node-Runtime | `engines.node = 22.x` in `package.json` (Vercel liest das) |
+
+> Der Vercel-Import selbst (Projekt anlegen, Env-Vars) ist ein manueller Schritt im Vercel-Dashboard;
+> aus einer Sandbox ohne Vercel-Zugang lässt sich nur die Konfiguration, nicht die Live-URL prüfen.
+> Nach dem Import einmal `npm run smoke -- <URL>` ausführen.
 
 ---
 
