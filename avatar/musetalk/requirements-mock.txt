@@ -1,0 +1,5 @@
+# Nur für den Mock-Sidecar ohne GPU (Platzhalter-Frames):
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart
+pillow

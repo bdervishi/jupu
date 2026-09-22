@@ -14,7 +14,7 @@ zum Anwaltsgeheimnis. Konzept: [`docs/concept/jupus-ch-konzept.md`](docs/concept
 | Komponente | Ordner | Hosting | Status |
 |---|---|---|---|
 | **Intake-MVP** (React) — Chatbot + Fristenrechner | Repo-Wurzel (`src/`, `api/`) | **Vercel** | lauffähig |
-| **Avatar-Sekretärin** (Echtzeit-Sprache/Avatar) | [`avatar/`](avatar/) | **GPU-VM** (nicht Vercel) | Phase-1-Gerüst |
+| **Avatar-Sekretärin** (Echtzeit-Sprache/Avatar) | [`avatar/`](avatar/) | **GPU-VM** (nicht Vercel) | Phase 2: Piper/VAD/LLM echt, MuseTalk-Sidecar |
 
 ---
 
@@ -79,12 +79,14 @@ Repo importieren, **Root Directory = `.`**, Framework Vite (kommt aus `vercel.js
 
 ## 2. Avatar-Sekretärin (`avatar/`)
 
-Sprechendes Echtzeit-Frontend: `Mic → Whisper (STT) → Hermes (LLM) → Piper (TTS) → MuseTalk (Lip-Sync)`.
+Sprechendes Echtzeit-Frontend: `Mic → Silero VAD + Whisper (STT) → Hermes (LLM) → Piper (TTS) → MuseTalk (Lip-Sync)`.
 Alle Modelle self-hosted → läuft auf **Schweizer GPU** (Infomaniak/Exoscale). **Nicht auf Vercel**
-(GPU + WebSocket nötig). Phase-1-Gerüst ist mock-lauffähig ohne GPU:
+(GPU + WebSocket nötig). Läuft ohne GPU im Mock-Modus; Piper-TTS und VAD laufen auch auf CPU:
 
 ```bash
-cd avatar && pip install -r requirements.txt && python -m server.main   # http://localhost:8080
+cd avatar && pip install -r requirements.txt && python -m server.main   # http://localhost:8080 (Mock)
+pip install -r requirements-models.txt && ./scripts/download-voices.sh --github
+TTS_ENGINE=piper python -m server.main                                  # echte Stimme DE/FR/IT
 ```
 
 Details: [`avatar/README.md`](avatar/README.md) · Architektur/Plan:

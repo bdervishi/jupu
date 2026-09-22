@@ -14,29 +14,38 @@ herausgelöst und als Wurzel dieses Repos gepusht.
 - **Intake-MVP** (Repo-Wurzel, React/Vite): Mehrsprachiger KI-Intake-Chatbot (DE/FR/IT),
   Mock-Modus + serverseitiger CH-KI-Proxy (`api/chat.ts`, Key nie im Browser).
 - **Fristen-Engine** (`src/lib/fristen.ts` + `src/lib/feiertage.ts`): deterministisch, ZPO/StPO/
-  VwVG/BGG, Tages-/Monatsfristen, 26 Kantone; aus dem Chatbot verlinkt. **14 Tests grün**
-  (`src/lib/fristen.test.ts`).
-- **Avatar-Sekretärin — Phase-1-Gerüst** (`avatar/`): asyncio-Pipeline mit Satz-Streaming +
-  Barge-in; echter LLM-Streaming-Client (Hermes/vLLM, OpenAI-kompatibel) + Mock; Satz-Splitter;
-  FastAPI-WebSocket-Server + Browser-Client. **Mock-lauffähig ohne GPU.** STT/TTS/Avatar als
-  strukturierte Stubs (`TODO(real)`).
-- **Deploy vorbereitet**: `vercel.json` (Root `.`, Vite→`dist`, `api/chat.ts` Function),
-  `.vercelignore` (schließt `avatar/`, `docs/` aus), `DEPLOY.md`.
+  VwVG/BGG, Tages-/Monatsfristen, 26 Kantone; aus dem Chatbot verlinkt.
+- **Frist ↔ Akte/Kalender** (`src/lib/termine.ts`, `kalenderStore.ts`, `KalenderView`): Fristablauf +
+  Vorfristen T-14/7/3/1 als Termine/Wiedervorlagen (Werktagsregel, idempotent), ICS-Export, Tab
+  «Kalender / Wiedervorlagen». End-to-End Chat → Frist → Termine getestet.
+- **Tests Intake-MVP: 28 grün** (`npm test`: Fristen 14, Termine 10, API-Kern 4).
+- **Avatar-Sekretärin — Phase 2** (`avatar/`): LLM-Streaming (Hermes/vLLM) ✅, **Piper-TTS DE/FR/IT
+  echt** (CPU verifiziert, ~0,1–0,2 s/Satz) ✅, **Silero-VAD + faster-whisper** ✅ (VAD lokal verifiziert,
+  Whisper-Modell braucht Download), **MuseTalk-Sidecar** (HTTP, `avatar/musetalk/`) 🟡 GPU-Verifikation
+  offen. Browser-Client mit Mikrofon (PCM16/16 kHz), Latenz-Metriken, `/health`. Jede Stufe mit
+  Mock-Fallback. **32 pytest-Tests** (25 ohne Modelle).
+- **Deploy verifiziert (lokal)**: Build, Function-Bundle, Laufzeit-Simulation `/api/chat`, Browser-
+  Durchstich; `npm run smoke -- <URL>` als Post-Deploy-Check; Node 22 gepinnt. `DEPLOY.md`.
 
 ## Offen / nächste Schritte 🔜
-- **Vercel-Import** des Intake-MVP (manuell durch den Nutzer, 1 Klick) — siehe `DEPLOY.md`.
-- **Avatar Phase 2**: echte Modelle anbinden. Reihenfolge: Hermes via vLLM → **Piper (DE/FR/IT)**
-  → faster-whisper (STT + Silero VAD) → MuseTalk. **Wichtig:** Kokoro kann kein Deutsch → Piper
-  ist Standard für DE/FR/IT (siehe `docs/live-avatar-sekretaerin.md` §8.1).
-- **Avatar Phase 3**: WebRTC (aiortc) statt WebSocket, Voll-Duplex/Barge-in in Echtzeit.
-- **Integration**: Hermes-Function-Calling füllt Intake-Felder + Frist-Trigger → Anbindung an
-  `src/lib/fristen.ts`; Verknüpfung Frist ↔ Akte/Kalender.
+- **Vercel-Import** des Intake-MVP (manuell im Vercel-Dashboard, 1 Klick), danach
+  `npm run smoke -- https://<projekt>.vercel.app` — siehe `DEPLOY.md`. (Aus der Sandbox war
+  api.vercel.com nicht erreichbar → Live-URL noch nicht geprüft.)
+- **Avatar Phase 2 (Rest, braucht GPU-Host)**: faster-whisper-Modell laden + Latenz messen; MuseTalk-
+  Sidecar mit echten Gewichten + Referenzvideo (`assets/sekretaerin_idle.mp4`, Rechte klären) auf der
+  Ziel-GPU verifizieren; vLLM/Hermes-TTFT messen. Piper-medium-Stimmen von Hugging Face laden.
+- **Avatar Phase 3**: WebRTC (aiortc) statt WebSocket, Voll-Duplex, Playback-Feedback statt Timer.
+- **Integration**: Hermes-Function-Calling füllt Intake-Felder + Frist-Trigger → `termine.ts`.
+- **Kalender produktiv**: localStorage durch CH-gehosteten Dienst / CalDAV / Kanzleisoftware ersetzen
+  (Domänenlogik in `termine.ts` bleibt).
 
 ## Schnellstart
 ```bash
 npm install && npm run dev     # Intake-MVP → http://localhost:5180
-npm test                       # 14 Fristen-Tests
+npm test                       # 28 Tests (Fristen, Termine/Kalender, API-Kern)
 cd avatar && pip install -r requirements.txt && python -m server.main   # Avatar (Mock) → :8080
+cd avatar && pip install -r requirements-models.txt && ./scripts/download-voices.sh --github \
+  && TTS_ENGINE=piper python -m server.main                              # Avatar mit echter Piper-Stimme
 ```
 
 ## Hosting-Prinzip

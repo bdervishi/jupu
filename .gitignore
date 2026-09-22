@@ -4,3 +4,8 @@ dist
 .env.local
 .vercel
 *.log
+# Avatar: Modelle/Stimmen/Assets bleiben ausserhalb des Repos
+avatar/voices/
+avatar/assets/*.mp4
+__pycache__/
+.pytest_cache/

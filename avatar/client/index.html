@@ -3,70 +3,134 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AdvoOS — Avatar-Sekretärin (Phase-1-Demo)</title>
+  <title>AdvoOS — Avatar-Sekretärin (Phase 2)</title>
   <style>
     body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
     .wrap { max-width: 760px; margin: 0 auto; padding: 20px; }
-    h1 { font-size: 18px; }
-    .avatar { width: 260px; height: 260px; margin: 0 auto; border-radius: 16px;
+    h1 { font-size: 18px; margin: 0 0 10px; }
+    .avatar { width: 260px; height: 260px; margin: 0 auto; border-radius: 16px; overflow: hidden; position: relative;
       background: radial-gradient(circle at 50% 40%, #334155, #0f172a); display: flex;
       align-items: center; justify-content: center; font-size: 64px; transition: box-shadow .2s; }
+    .avatar canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+    .avatar.frames canvas { display: block; }
     .avatar.speaking { box-shadow: 0 0 0 4px #22c55e; }
-    .state { text-align: center; color: #94a3b8; font-size: 13px; margin: 8px 0 16px; }
+    .avatar.listening { box-shadow: 0 0 0 4px #f59e0b; }
+    .state { text-align: center; color: #94a3b8; font-size: 13px; margin: 8px 0 12px; }
+    .modes { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .mode { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #1e293b; color: #94a3b8; }
+    .mode.real { background: #14532d; color: #bbf7d0; }
     .log { background: #1e293b; border-radius: 10px; padding: 12px; height: 200px; overflow-y: auto; font-size: 14px; }
-    .row { display: flex; gap: 8px; margin-top: 12px; }
-    input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0b1220; color: #e2e8f0; }
+    .row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    input, select { padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0b1220; color: #e2e8f0; }
+    input { flex: 1; min-width: 200px; }
     button { padding: 10px 16px; border: 0; border-radius: 8px; background: #1e3a8a; color: #fff; font-weight: 600; cursor: pointer; }
     button.warn { background: #b45309; }
+    button.mic { background: #334155; }
+    button.mic.on { background: #b91c1c; }
+    button:disabled { opacity: .5; cursor: default; }
     .banner { background: #92400e; color: #fde68a; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+    .metrics { font-family: ui-monospace, monospace; font-size: 12px; color: #94a3b8; margin-top: 8px; min-height: 16px; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>AdvoOS — Avatar-Sekretärin</h1>
-    <div class="banner">Phase-1-Demo (WebSocket, Mock-Modus). Sprache/Avatar folgen in Phase 2/3. Keine echten Daten eingeben.</div>
-    <div class="avatar" id="avatar">🧑‍💼</div>
+    <div class="banner">Phase-2-Demo (WebSocket). Keine echten Mandantendaten eingeben. Der Avatar ist eine KI.</div>
+    <div class="avatar" id="avatar">🧑‍💼<canvas id="canvas" width="512" height="512"></canvas></div>
     <div class="state" id="state">verbinde …</div>
+    <div class="modes" id="modes"></div>
     <div class="log" id="log"></div>
     <div class="row">
       <input id="text" placeholder="Nachricht an die Sekretärin …" autocomplete="off" />
+      <select id="lang"><option value="de">DE</option><option value="fr">FR</option><option value="it">IT</option></select>
       <button id="send">Senden</button>
+      <button id="mic" class="mic" title="Mikrofon (nur mit STT_ENABLED=true)">🎤 Sprechen</button>
       <button id="barge" class="warn">Unterbrechen</button>
     </div>
+    <div class="metrics" id="metrics"></div>
   </div>
   <script>
     const log = document.getElementById('log');
     const stateEl = document.getElementById('state');
     const avatar = document.getElementById('avatar');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const metricsEl = document.getElementById('metrics');
     const audioQueue = [];
     let playing = false;
+    let sttEnabled = false;
 
     function add(msg) { const d = document.createElement('div'); d.textContent = msg; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
-    const ws = new WebSocket(`ws://${location.host}/ws`);
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws.binaryType = 'arraybuffer';
     ws.onopen = () => stateEl.textContent = 'bereit';
     ws.onclose = () => stateEl.textContent = 'Verbindung getrennt';
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
-      if (m.type === 'state') { stateEl.textContent = m.state; avatar.classList.toggle('speaking', m.state === 'thinking'); if (m.state === 'interrupted') { audioQueue.length = 0; } }
+      if (m.type === 'hello') showModes(m.modes);
+      else if (m.type === 'state') {
+        stateEl.textContent = m.state;
+        avatar.classList.toggle('listening', m.state === 'listening');
+        if (m.state === 'interrupted') stopPlayback();
+      }
+      else if (m.type === 'transcript') add(`🧑 (${m.lang}, ${m.stt_ms} ms) ${m.text}`);
       else if (m.type === 'sentence') add('🧑‍💼 ' + m.text);
       else if (m.type === 'audio') enqueueAudio(m);
+      else if (m.type === 'metrics') metricsEl.textContent =
+        `STT ${m.stt_ms ?? '–'} ms · TTFT ${m.ttft_ms} ms · 1. Satz ${m.first_sentence_ms} ms · 1. Audio ${m.first_audio_ms} ms · gesamt ${m.total_ms} ms · ${m.sentences} Sätze`;
       else if (m.type === 'error') add('⚠ ' + m.message);
     };
 
-    function enqueueAudio(m) {
-      const bytes = Uint8Array.from(atob(m.wav_b64), c => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
-      audioQueue.push(url); playNext();
+    function showModes(modes) {
+      sttEnabled = modes.stt !== 'mock';
+      document.getElementById('mic').disabled = !sttEnabled;
+      const el = document.getElementById('modes'); el.innerHTML = '';
+      for (const [k, v] of Object.entries(modes)) {
+        if (k === 'lang') continue;
+        const s = document.createElement('span'); s.className = 'mode' + (v !== 'mock' ? ' real' : '');
+        s.textContent = `${k}: ${v}`; el.appendChild(s);
+      }
+    }
+
+    // --- Playback (Audio + optionale MuseTalk-Frames) --------------------
+    let current = null;
+    function enqueueAudio(m) { audioQueue.push(m); playNext(); }
+    function stopPlayback() {
+      audioQueue.length = 0;
+      if (current) { current.pause(); current = null; }
+      playing = false; avatar.classList.remove('speaking', 'frames');
     }
     function playNext() {
       if (playing || !audioQueue.length) return;
+      const m = audioQueue.shift();
       playing = true; avatar.classList.add('speaking');
-      const audio = new Audio(audioQueue.shift());
-      audio.onended = () => { playing = false; avatar.classList.toggle('speaking', audioQueue.length > 0); playNext(); };
+      const bytes = Uint8Array.from(atob(m.wav_b64), c => c.charCodeAt(0));
+      const audio = new Audio(URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' })));
+      current = audio;
+      const frames = (m.frames || []).map(b64 => { const img = new Image(); img.src = 'data:image/jpeg;base64,' + b64; return img; });
+      let raf = null;
+      if (frames.length) {
+        avatar.classList.add('frames');
+        const draw = () => {
+          const i = Math.min(frames.length - 1, Math.floor(audio.currentTime * (m.fps || 25)));
+          if (frames[i].complete) ctx.drawImage(frames[i], 0, 0, canvas.width, canvas.height);
+          raf = requestAnimationFrame(draw);
+        };
+        raf = requestAnimationFrame(draw);
+      }
+      audio.onended = () => {
+        if (raf) cancelAnimationFrame(raf);
+        playing = false; current = null;
+        avatar.classList.toggle('speaking', audioQueue.length > 0);
+        if (!audioQueue.length) avatar.classList.remove('frames');
+        playNext();
+      };
       audio.play().catch(() => { playing = false; });
     }
 
+    // --- Text -----------------------------------------------------------------
     function send() {
       const t = document.getElementById('text');
       if (!t.value.trim()) return;
@@ -76,7 +140,48 @@
     }
     document.getElementById('send').onclick = send;
     document.getElementById('text').addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
-    document.getElementById('barge').onclick = () => { audioQueue.length = 0; ws.send(JSON.stringify({ type: 'barge_in' })); };
+    document.getElementById('lang').onchange = (e) => ws.send(JSON.stringify({ type: 'lang', lang: e.target.value }));
+    document.getElementById('barge').onclick = () => { stopPlayback(); ws.send(JSON.stringify({ type: 'barge_in' })); };
+
+    // --- Mikrofon → PCM16 mono 16 kHz → binäre WS-Frames ---------------------
+    let micCtx = null, micStream = null, micNode = null;
+    function downsample(buf, srcRate, dstRate) {
+      if (srcRate === dstRate) return buf;
+      const ratio = srcRate / dstRate, n = Math.floor(buf.length / ratio), out = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const start = Math.floor(i * ratio), end = Math.min(buf.length, Math.floor((i + 1) * ratio));
+        let sum = 0, cnt = 0;
+        for (let j = start; j < end; j++) { sum += buf[j]; cnt++; }
+        out[i] = cnt ? sum / cnt : 0;
+      }
+      return out;
+    }
+    function toPcm16(f32) {
+      const out = new Int16Array(f32.length);
+      for (let i = 0; i < f32.length; i++) { const s = Math.max(-1, Math.min(1, f32[i])); out[i] = s < 0 ? s * 0x8000 : s * 0x7fff; }
+      return out.buffer;
+    }
+    async function micToggle() {
+      const btn = document.getElementById('mic');
+      if (micCtx) {
+        micNode.disconnect(); micStream.getTracks().forEach(t => t.stop()); await micCtx.close();
+        micCtx = micStream = micNode = null; btn.classList.remove('on'); btn.textContent = '🎤 Sprechen'; return;
+      }
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+        micCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = micCtx.createMediaStreamSource(micStream);
+        // ScriptProcessor ist deprecated, aber überall verfügbar; Phase 3: AudioWorklet + WebRTC.
+        micNode = micCtx.createScriptProcessor(4096, 1, 1);
+        micNode.onaudioprocess = (e) => {
+          if (ws.readyState !== 1) return;
+          ws.send(toPcm16(downsample(e.inputBuffer.getChannelData(0), micCtx.sampleRate, 16000)));
+        };
+        src.connect(micNode); micNode.connect(micCtx.destination);
+        btn.classList.add('on'); btn.textContent = '⏹ Mikrofon aus';
+      } catch (err) { add('⚠ Mikrofon: ' + err.message); }
+    }
+    document.getElementById('mic').onclick = micToggle;
   </script>
 </body>
 </html>

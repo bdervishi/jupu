@@ -1,0 +1,7 @@
+# Reale Modelle für Phase 2 (alle laufen auch auf CPU — GPU macht STT deutlich schneller).
+-r requirements.txt
+numpy
+piper-tts>=1.3           # TTS DE/FR/IT (Standard) — Kokoro kann kein Deutsch!
+faster-whisper>=1.0      # STT (CTranslate2); Modell via STT_MODEL (HF-Name oder lokaler Ordner)
+silero-vad>=5.0          # VAD / End-of-Turn (ONNX-Modell liegt im Paket bei)
+onnxruntime              # für Silero (onnx=True) — CPU reicht

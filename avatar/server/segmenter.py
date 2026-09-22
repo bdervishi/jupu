@@ -10,33 +10,46 @@ Zwei Schutzmechanismen gegen falsche Schnitte:
   und Zahlen wie „3.5" ungetrennt.
 - Zu kurze Fragmente (z. B. „Grüezi.") werden mit dem nächsten Satz verschmolzen,
   statt einen eigenen — und alle folgenden — Schnitte zu blockieren.
+- Mitten im Stream gilt ein Satzzeichen am Pufferende NICHT als Grenze: erst das
+  nächste Token zeigt, ob wirklich ein neuer Satz beginnt (kostet ein Token Latenz,
+  verhindert aber Schnitte vor schliessenden Anführungszeichen wie „… bail. »").
+  Erst wenn der Stream endet, wird der Rest geflusht.
+- Schliessende Anführungszeichen/Klammern direkt nach dem Satzzeichen gehören zum Satz.
 """
 from __future__ import annotations
 
 from typing import AsyncIterator, Iterable
 
 _SENTENCE_ENDINGS = ".!?…"
+_CLOSERS = "»\"'”“)]"
 _MIN_CHARS = 12
 
 
-def _cut_index(text: str, min_chars: int) -> int:
-    """Index (inkl.) des ersten Satzzeichens, dessen vorangehendes Segment lang genug ist.
+def _cut_index(text: str, min_chars: int, final: bool = True) -> int:
+    """Index (inkl.) des ersten Satzendes, dessen vorangehendes Segment lang genug ist.
 
-    -1, wenn (noch) kein gültiger Schnitt existiert.
+    `final=False` (Stream läuft noch): ein Satzzeichen am Pufferende ist noch keine
+    Grenze. -1, wenn (noch) kein gültiger Schnitt existiert.
     """
     for i, ch in enumerate(text):
         if ch not in _SENTENCE_ENDINGS:
             continue
+        # schliessende Anführungszeichen/Klammern gehören noch zum Satz
+        end = i
+        while end + 1 < len(text) and text[end + 1] in _CLOSERS:
+            end += 1
         # nächstes Nicht-Leerzeichen bestimmen
-        j = i + 1
+        j = end + 1
         while j < len(text) and text[j] in " \n\t":
             j += 1
         at_end = j >= len(text)
-        starts_new = at_end or text[j].isupper()
+        if at_end and not final:
+            return -1  # erst das nächste Token entscheidet
+        starts_new = at_end or text[j].isupper() or text[j] in "«\"„“"
         if not starts_new:
             continue  # z. B. "Art. 142", "3.5" → keine Grenze
-        if len(text[: i + 1].strip()) >= min_chars:
-            return i
+        if len(text[: end + 1].strip()) >= min_chars:
+            return end
     return -1
 
 
@@ -45,14 +58,14 @@ async def sentences(tokens: AsyncIterator[str], min_chars: int = _MIN_CHARS) -> 
     buf = ""
     async for tok in tokens:
         buf += tok
-        idx = _cut_index(buf, min_chars)
+        idx = _cut_index(buf, min_chars, final=False)
         while idx != -1:
             yield buf[: idx + 1].strip()
             buf = buf[idx + 1 :].lstrip()
-            idx = _cut_index(buf, min_chars)
-    tail = buf.strip()
-    if tail:
-        yield tail
+            idx = _cut_index(buf, min_chars, final=False)
+    # Stream zu Ende: Rest satzweise flushen
+    for s in split_text(buf, min_chars):
+        yield s
 
 
 def split_text(text: str, min_chars: int = _MIN_CHARS) -> Iterable[str]:

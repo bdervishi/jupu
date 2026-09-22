@@ -1,6 +1,11 @@
-# AdvoOS Avatar — Media-Server + Hermes (vLLM).
-# Der Media-Server läuft auch ohne vLLM (Mock-LLM). Für echten Betrieb den
-# vllm-Service aktivieren und LLM_BASE_URL=http://vllm:8000/v1 setzen.
+# AdvoOS Avatar — Media-Server + Hermes (vLLM) + MuseTalk-Sidecar.
+# Der Media-Server läuft auch ohne die GPU-Dienste (Mock-LLM / Mock-Avatar).
+#
+#   docker compose up app                          # Mock (kein GPU)
+#   docker compose --profile gpu up                # alles echt (NVIDIA-GPU nötig)
+#
+# Stufenweise umstellen (Env-Variablen, siehe server/config.py):
+#   LLM_BASE_URL=http://vllm:8000/v1   TTS_ENGINE=piper   STT_ENABLED=true   AVATAR_URL=http://musetalk:8090
 
 services:
   app:
@@ -11,20 +16,51 @@ services:
       - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_MODEL=${LLM_MODEL:-NousResearch/Hermes-3-Llama-3.1-8B}
       - TTS_ENGINE=${TTS_ENGINE:-mock}
+      - PIPER_VOICES_DIR=/app/voices
       - STT_ENABLED=${STT_ENABLED:-false}
+      - STT_MODEL=${STT_MODEL:-small}
+      - STT_DEVICE=${STT_DEVICE:-auto}
       - AVATAR_ENABLED=${AVATAR_ENABLED:-false}
-    # Für echte STT/TTS/Avatar-Modelle braucht dieser Service ebenfalls GPU:
+      - AVATAR_URL=${AVATAR_URL:-}
+    volumes:
+      - ./voices:/app/voices:ro          # Piper-Stimmen (scripts/download-voices.sh)
+      - hf-cache:/root/.cache/huggingface # faster-whisper-Modelle
+    # Für schnelle STT auf GPU zusätzlich:
     # deploy: { resources: { reservations: { devices: [{ capabilities: [gpu] }] } } }
 
-  # Hermes über vLLM (OpenAI-kompatibel). Braucht NVIDIA-GPU.
+  # Hermes über vLLM (OpenAI-kompatibel). Braucht NVIDIA-GPU (~16–20 GB für 8B).
   vllm:
     image: vllm/vllm-openai:latest
-    profiles: ["gpu"]            # nur mit `--profile gpu` starten
-    command: ["--model", "NousResearch/Hermes-3-Llama-3.1-8B", "--max-model-len", "8192"]
+    profiles: ["gpu"]
+    command: ["--model", "${LLM_MODEL:-NousResearch/Hermes-3-Llama-3.1-8B}", "--max-model-len", "8192", "--dtype", "auto"]
     ports:
       - "8000:8000"
+    volumes:
+      - hf-cache:/root/.cache/huggingface
     deploy:
       resources:
         reservations:
           devices:
             - capabilities: ["gpu"]
+
+  # MuseTalk-Lip-Sync als Sidecar (GPU, ~4–6 GB). Gewichte per Volume.
+  musetalk:
+    build: ./musetalk
+    profiles: ["gpu"]
+    environment:
+      - AVATAR_REFERENCE=/opt/MuseTalk/assets/sekretaerin_idle.mp4
+      - MUSETALK_FPS=25
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./assets:/opt/MuseTalk/assets:ro
+      - musetalk-models:/opt/MuseTalk/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+
+volumes:
+  hf-cache:
+  musetalk-models:

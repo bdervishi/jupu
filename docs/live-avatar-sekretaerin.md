@@ -3,8 +3,12 @@
 Sprechendes Echtzeit-Avatar-Frontend für AdvoOS: der Nutzer spricht, eine animierte
 Sekretärin hört zu, denkt (LLM) und antwortet mit lippensynchroner Stimme.
 
-**Pipeline (vom Nutzer gewünscht):**
-`Mikrofon → STT (Whisper) → LLM (Hermes, Stream) → TTS (Kokoro) → Lip-Sync (MuseTalk) → Video+Audio zum Nutzer`
+**Pipeline:**
+`Mikrofon → STT (Whisper) → LLM (Hermes, Stream) → TTS (Piper; Kokoro nur EN) → Lip-Sync (MuseTalk) → Video+Audio zum Nutzer`
+
+> **Stand 2026-09-22 (Phase 2):** LLM-Streaming, Piper-TTS und Silero-VAD/faster-whisper sind in
+> `avatar/server/` echt angebunden (Piper und VAD lokal auf CPU verifiziert), MuseTalk als GPU-Sidecar
+> vorbereitet. Details, Schalter und gemessene Latenzen: `avatar/README.md`.
 
 **Warum das strategisch passt:** Alle vier Modelle sind **Open-Source und self-hostbar** →
 kein US-Cloud-Zwang, Daten bleiben auf Schweizer GPU-Infrastruktur → deckt sich mit der
@@ -35,7 +39,7 @@ Nebenläufigkeit + Barge-in**. Darauf liegt der Fokus (§4).
  │ Mic-Capture        ├────────────────────▶│ 1) VAD (Silero) → Utterance-Segmentierung │
  │ Avatar-<video>     │                      │ 2) STT faster-whisper → Text              │
  │ Audio-Playback     │◀────────────────────┤ 3) Hermes (vLLM) → Token-Stream           │
- └───────────────────┘  video+audio (Stream)│ 4) Satz-Splitter → Kokoro TTS je Satz     │
+ └───────────────────┘  video+audio (Stream)│ 4) Satz-Splitter → Piper TTS je Satz      │
         ▲    │ Barge-in (User spricht)       │ 5) MuseTalk: Audio → lippensynchr. Frames │
         │    └──────────────────────────────▶│ 6) Encode → WebRTC video+audio track      │
         └────────────────────────────────────┘  (Cancel-Signal bricht 3–6 sofort ab)
@@ -46,8 +50,8 @@ Nebenläufigkeit + Barge-in**. Darauf liegt der Fokus (§4).
 2. **Silero VAD** erkennt Sprechpausen → schliesst eine „Utterance" ab (End-of-Turn).
 3. **faster-whisper** transkribiert die Utterance (Sprache DE/FR/IT autoerkannt).
 4. Text + Konversationsverlauf → **Hermes** (vLLM) → **Token-Stream**.
-5. Ein **Satz-Splitter** schneidet den Token-Stream in Sätze; jeder fertige Satz geht sofort an **Kokoro**.
-6. Kokoro-Audio je Satz → **MuseTalk** erzeugt lippensynchrone Frames.
+5. Ein **Satz-Splitter** schneidet den Token-Stream in Sätze; jeder fertige Satz geht sofort an **Piper**.
+6. Piper-Audio je Satz → **MuseTalk** erzeugt lippensynchrone Frames.
 7. Frames + Audio werden als WebRTC-Tracks zum Client gestreamt → Avatar spricht, während Hermes noch weiterschreibt.
 
 ---
@@ -78,7 +82,7 @@ fertig ist → TTS → MuseTalk → abspielen, während der Rest generiert wird.
 | VAD End-of-Turn (Stille) | 200–400 ms |
 | Whisper Transkription | 150–400 ms |
 | Hermes Time-to-first-token | 100–400 ms |
-| 1. Satz → Kokoro | 100–300 ms |
+| 1. Satz → Piper | 100–200 ms (gemessen, CPU) |
 | MuseTalk erste Frames | 100–300 ms |
 | **Summe bis erster Ton** | **~0,8–1,5 s** |
 
@@ -118,16 +122,21 @@ laufen parallel (Producer/Consumer).
 ```
 avatar/
 ├── server/
-│   ├── main.py            # FastAPI + WebRTC/WS Signalisierung
-│   ├── pipeline.py        # asyncio-Orchestrierung (Queues, Cancel/Barge-in)
-│   ├── stt.py             # faster-whisper + Silero VAD
-│   ├── llm.py             # Hermes via vLLM (OpenAI-kompatibel, Stream)  ← Muster aus advoos-mvp
-│   ├── tts.py             # Kokoro (satzweises Streaming)
-│   ├── avatar.py          # MuseTalk-Wrapper (Idle-Loop + Lip-Sync)
+│   ├── main.py            # FastAPI + WS-Signalisierung (Text + binäre Audio-Frames), /health
+│   ├── pipeline.py        # asyncio-Orchestrierung (Satz-Pipelining, Barge-in, Latenz-Metriken)
+│   ├── stt.py             # Silero VAD (Streaming, End-of-Turn) + faster-whisper
+│   ├── llm.py             # Hermes via vLLM (OpenAI-kompatibel, SSE-Stream)  ← Muster aus api/_core.ts
+│   ├── tts.py             # Piper DE/FR/IT (satzweise), Mock-Fallback; Kokoro nur EN
+│   ├── avatar.py          # MuseTalk-Sidecar-Client (HTTP → JPEG-Frames), Mock-Fallback
+│   ├── audio.py           # WAV/PCM-Helfer
 │   └── segmenter.py       # Token-Stream → Sätze
-├── client/                # Browser: Mic-Capture, WebRTC, <video>-Avatar
-├── assets/                # Referenz-Portrait / Idle-Video der Sekretärin
-├── docker-compose.yml     # vLLM + Media-Server + GPU
+├── musetalk/              # GPU-Sidecar: MuseTalk hinter POST /animate (+ Mock ohne GPU)
+├── client/                # Browser: Mic-Capture (PCM16/16 kHz), Audio-Playback, Frame-Canvas
+├── scripts/               # download-voices.sh (Piper-Stimmen)
+├── tests/                 # pytest (32 Tests; ohne Modelle 25 + 7 übersprungen)
+├── voices/                # Piper-Stimmen (nicht im Repo)
+├── assets/                # Referenz-Portrait / Idle-Video der Sekretärin (nicht im Repo)
+├── docker-compose.yml     # Media-Server + vLLM + MuseTalk (GPU-Profil)
 └── README.md
 ```
 
@@ -160,10 +169,10 @@ avatar/
 
 - **Phase 0 — Spikes/Machbarkeit:** Jede Komponente einzeln auf der Ziel-GPU messen (Whisper-Latenz,
   Hermes-TTFT, Kokoro/Piper je Sprache, MuseTalk fps). TTS-Entscheid für DE fixieren (§8.1).
-- **Phase 1 — Turn-based MVP (WebSocket):** Push-to-talk → Whisper → Hermes (ganze Antwort) → TTS →
-  MuseTalk → Playback. Kein Streaming, kein Barge-in. Beweist die Kette.
-- **Phase 2 — Streaming:** Satz-Splitter + Pipelining (erster Satz spricht, während LLM weiterläuft).
-  Ziel: erster Ton < 1,5 s.
+- **Phase 1 — Gerüst (WebSocket) ✅:** Pipeline mit Satz-Streaming + Barge-in, Mock-lauffähig.
+- **Phase 2 — echte Modelle 🟡 (in Arbeit):** LLM-Streaming ✅, Piper ✅ (CPU verifiziert), Silero-VAD ✅
+  + faster-whisper ✅ (Modell-Download auf Ziel-Host), MuseTalk-Sidecar 🟡 (auf GPU zu verifizieren).
+  Ziel: erster Ton < 1,5 s — lokal 0,6–0,7 s mit Mock-LLM; GPU-Messung offen.
 - **Phase 3 — Realtime (WebRTC) + Barge-in:** Voll-Duplex, Unterbrechen, Idle-Loop des Avatars.
 - **Phase 4 — AdvoOS-Integration:** Hermes-Function-Calling füllt die Intake-Felder + Frist-Trigger;
   der Avatar wird das Sprach-Frontend der Mandatsannahme (Anbindung an `fristen.ts`, Dashboard).
