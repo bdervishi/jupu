@@ -1,101 +1,104 @@
-# AdvoOS — MVP-Demo: KI-Intake-Chatbot
+# AdvoOS (jupu) — KI-Sekretariat für Schweizer Kanzleien
 
-Eigenständige, „lift-out-ready" Demo eines **KI-Sekretariats für Schweizer Kanzleien**
-(Schweizer Pendant zu Jupus). Sie zeigt den Kern-Use-Case **Mandatsannahme**: Ein
-Website-Besucher beschreibt sein Anliegen in Freitext (DE/FR/IT), die KI führt ein
-strukturiertes Intake-Gespräch und erzeugt **live eine kategorisierte Mandatsanfrage**.
+Schweizer, datensouveränes Pendant zu Jupus: eine KI-Sekretärin, die die **Mandatsannahme**
+übernimmt (mehrsprachiges Intake DE/FR/IT), **prozessuale Fristen** haftungssicher berechnet
+und – als Ausbaustufe – als **sprechende Avatar-Sekretärin** in Echtzeit interagiert.
 
-> Dieses Verzeichnis hängt von **nichts** aus dem umgebenden SwissBrokerOS-Repo ab und kann
-> jederzeit per Copy / `git subtree split` in ein eigenes Repo gehoben werden.
+Kernprinzip: **CH-Datenresidenz, kein US-CLOUD-Act-Exposure für privilegierte Daten** — passend
+zum Anwaltsgeheimnis. Konzept: [`docs/concept/jupus-ch-konzept.md`](docs/concept/jupus-ch-konzept.md).
 
-## Was die Demo zeigt
+---
+
+## Zwei Komponenten
+
+| Komponente | Ordner | Hosting | Status |
+|---|---|---|---|
+| **Intake-MVP** (React) — Chatbot + Fristenrechner | Repo-Wurzel (`src/`, `api/`) | **Vercel** | lauffähig |
+| **Avatar-Sekretärin** (Echtzeit-Sprache/Avatar) | [`avatar/`](avatar/) | **GPU-VM** (nicht Vercel) | Phase-1-Gerüst |
+
+---
+
+## 1. Intake-MVP (dieser Repo-Root)
 
 Zwei Tabs:
 
-**1. Mandatsannahme (KI-Intake-Chatbot)**
-- **Split-Screen:** links die Mandanten-Sicht (Chat-Widget), rechts die Kanzlei-Sicht
-  (Mandatsanfrage, die sich live mit Rechtsgebiet, Gegenpartei, Sachverhalt, Dringlichkeit,
-  Kontakt und einem **Frist-Hinweis** füllt).
-- **Mehrsprachig** DE/FR/IT mit einfacher Sprach-Autoerkennung.
-- **Anwaltsgeheimnis-Hinweis** im Gespräch + Demo-Banner (keine echten Daten).
-- **Konfliktprüfung** und **nächster Schritt (Termin)** als Platzhalter-Signale.
+**Mandatsannahme (KI-Intake-Chatbot)** — Split-Screen: links Mandanten-Chat, rechts die
+Kanzlei-Mandatsanfrage, die sich live füllt (Rechtsgebiet, Gegenpartei, Sachverhalt,
+Dringlichkeit, Kontakt, Frist-Hinweis). Mehrsprachig DE/FR/IT, Anwaltsgeheimnis-Hinweis.
 
-**2. Fristenrechner (deterministische CH-Fristen-Engine)** — der eigentliche Moat
-- Berechnet prozessuale Fristen **ohne LLM** (haftungskritisch → exakt & nachvollziehbar) für
-  **ZPO · StPO · VwVG · BGG**, **Tages- und Monatsfristen**:
-  - Folgetag-Regel (ZPO 142 I / StPO 90 I / VwVG 20 I / BGG 44 I)
-  - Gerichtsferien/Stillstand (ZPO 145 / VwVG 22a / BGG 46: Ostern / 15.7–15.8 / 18.12–2.1) —
-    im **StPO kein Stillstand**
-  - Beginn nach Stillstand (ZPO 146 I) · Werktagsverschiebung (ZPO 142 III) · Monatsende-Regel (142 II)
-- **Vollständige kantonale Feiertage** aller 26 Kantone (`src/lib/feiertage.ts`, inkl. beweglicher
-  Feiertage wie Näfelser Fahrt, Jeûne genevois, Lundi du Jeûne).
-- Zeigt **Schritt-für-Schritt-Begründung mit Normzitaten**, **Vorfristen** (14/7/3/1 Tage).
-- **Direkt aus dem Chatbot:** Erkennt der Intake eine Frist, öffnet ein Klick den Rechner mit
-  vorbefülltem Zustelldatum.
-- Vollständig client-seitig → kostenlos und offline. Engine: `src/lib/fristen.ts` +
-  `src/lib/feiertage.ts`, getestet in `src/lib/fristen.test.ts` (`npm test`, 14 Fälle).
+**Fristenrechner (deterministische CH-Fristen-Engine)** — der Moat: berechnet Fristen **ohne LLM**
+(exakt & nachvollziehbar) für **ZPO · StPO · VwVG · BGG** (Tages-/Monatsfristen, Gerichtsferien,
+Werktagsverschiebung), inkl. **Feiertage aller 26 Kantone**, mit Normzitaten und Vorfristen.
+Engine: `src/lib/fristen.ts` + `src/lib/feiertage.ts`, getestet in `src/lib/fristen.test.ts`.
 
-## Schnellstart (kostenlos, ohne KI-Key)
+### Schnellstart (kostenlos, ohne KI-Key)
 
 ```bash
-cd advoos-mvp
 npm install
 npm run dev      # → http://localhost:5180
 ```
 
-Ohne konfigurierten Key läuft die Demo im **Mock-Modus** (offline, regelbasiert) — ideal zum
-Vorzeigen ohne laufende Kosten.
+Ohne Key läuft alles im **Mock-Modus** (offline, regelbasiert).
 
-## Mit echter Schweizer KI (optional)
+### Mit echter Schweizer KI (optional)
 
-Datenschutzkonform mit einem **Schweizer, OpenAI-kompatiblen** Anbieter (z. B. **Infomaniak AI**:
-CH-gehostet, kein Logging/Training, 1 Mio. Gratis-Tokens zum Test). `.env` anlegen:
+OpenAI-kompatibler CH-Anbieter (z. B. **Infomaniak AI**). `.env` anlegen:
 
 ```bash
-cp .env.example .env
-# AI_BASE_URL / AI_API_KEY / AI_MODEL eintragen, dann:
+cp .env.example .env      # AI_BASE_URL / AI_API_KEY / AI_MODEL eintragen
 npm run dev
 ```
 
-Der Key bleibt **serverseitig** (kein `VITE_`-Präfix) und gelangt nie in den Browser — der
-Browser spricht nur den eigenen Proxy `/api/chat`.
+Der Key bleibt **serverseitig** (kein `VITE_`-Präfix) — der Browser spricht nur den eigenen
+Proxy `/api/chat`.
 
-## Architektur
+### Architektur
 
 ```
 Browser (React/Vite)  →  /api/chat (Proxy, Key serverseitig)  →  CH-KI (OpenAI-kompatibel)
-                                         │
-                                         └─ kein Key gesetzt → lokaler Mock (gratis, offline)
+                                         └─ kein Key → lokaler Mock (gratis, offline)
 ```
 
 - `src/` — React-UI (App, ChatWidget, IntakeDashboard, i18n, aiClient)
-- `api/_core.ts` — framework-agnostischer Intake-Kern (KI-Call **oder** Mock)
-- `api/chat.ts` — Vercel Serverless Function (Produktion)
-- `vite.config.ts` — Dev-Middleware, die denselben Kern lokal unter `/api/chat` bedient
+- `api/_core.ts` — framework-agnostischer Intake-Kern · `api/chat.ts` — Vercel Function
+- `vite.config.ts` — Dev-Middleware für `/api/chat`
 
-## Deploy auf Vercel
+### Deploy → Vercel
 
-1. `advoos-mvp/` als eigenes Projekt importieren (oder Root auf dieses Verzeichnis setzen).
-2. Build-Command `npm run build`, Output `dist`.
-3. Env-Variablen `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` setzen (optional → sonst Mock).
-4. `api/chat.ts` wird automatisch als Function unter `/api/chat` deployed.
+Repo importieren, **Root Directory = `.`**, Framework Vite (kommt aus `vercel.json`), optional
+`AI_BASE_URL/AI_API_KEY/AI_MODEL` setzen. Vollständiges Runbook: [`DEPLOY.md`](DEPLOY.md).
 
-## Wichtiger Datenschutz-Hinweis
+---
 
-Dies ist eine **Demo mit Dummy-Daten**. Für den Produktivbetrieb mit echten Mandantendaten gilt
-die im Konzept (`docs/concept/jupus-ch-konzept.md`, §11) beschriebene CH-souveräne Architektur:
-Datenresidenz Schweiz, kein US-CLOUD-Act-Exposure für privilegierte Daten, DPA mit
-Berufsgeheimnis-Klausel, kein KI-Training.
+## 2. Avatar-Sekretärin (`avatar/`)
+
+Sprechendes Echtzeit-Frontend: `Mic → Whisper (STT) → Hermes (LLM) → Piper (TTS) → MuseTalk (Lip-Sync)`.
+Alle Modelle self-hosted → läuft auf **Schweizer GPU** (Infomaniak/Exoscale). **Nicht auf Vercel**
+(GPU + WebSocket nötig). Phase-1-Gerüst ist mock-lauffähig ohne GPU:
+
+```bash
+cd avatar && pip install -r requirements.txt && python -m server.main   # http://localhost:8080
+```
+
+Details: [`avatar/README.md`](avatar/README.md) · Architektur/Plan:
+[`docs/live-avatar-sekretaerin.md`](docs/live-avatar-sekretaerin.md).
+
+---
 
 ## Tests
 
 ```bash
-npm test        # Vitest — Fristen-Engine (9 Fälle)
+npm test          # Vitest — Fristen-Engine (14 Fälle)
 npm run typecheck
 ```
 
-## Bewusst nicht enthalten (Folge-Phasen)
+## Datenschutz-Hinweis
 
-Telefonassistent, Dokumenten-KI (PDF/E-Mail-Extraktion), automatische Verknüpfung Frist↔Akte/
-Kalender, innerkantonale (regionale) Feiertagsunterschiede, eSignatur, echte Auth/DB,
-Produktions-Compliance.
+Aktuell **Demo mit Dummy-Daten**. Für den Produktivbetrieb mit echten Mandantendaten gilt die
+CH-souveräne Architektur aus dem Konzept (§11): Datenresidenz Schweiz, DPA mit
+Berufsgeheimnis-Klausel, kein KI-Training.
+
+## Herkunft
+
+Dieser Code wurde als eigenständiges Projekt aus dem SwissBrokerOS-Repo herausgelöst
+(`git subtree split`, Historie erhalten).
