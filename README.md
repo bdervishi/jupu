@@ -20,7 +20,7 @@ zum Anwaltsgeheimnis. Konzept: [`docs/concept/jupus-ch-konzept.md`](docs/concept
 
 ## 1. Intake-MVP (dieser Repo-Root)
 
-Zwei Tabs:
+Drei Tabs:
 
 **Mandatsannahme (KI-Intake-Chatbot)** — Split-Screen: links Mandanten-Chat, rechts die
 Kanzlei-Mandatsanfrage, die sich live füllt (Rechtsgebiet, Gegenpartei, Sachverhalt,
@@ -30,6 +30,13 @@ Dringlichkeit, Kontakt, Frist-Hinweis). Mehrsprachig DE/FR/IT, Anwaltsgeheimnis-
 (exakt & nachvollziehbar) für **ZPO · StPO · VwVG · BGG** (Tages-/Monatsfristen, Gerichtsferien,
 Werktagsverschiebung), inkl. **Feiertage aller 26 Kantone**, mit Normzitaten und Vorfristen.
 Engine: `src/lib/fristen.ts` + `src/lib/feiertage.ts`, getestet in `src/lib/fristen.test.ts`.
+
+**Kalender / Wiedervorlagen (Frist ↔ Akte)** — eine berechnete Frist wird per Klick in eine Akte
+übernommen: der **Fristablauf als Termin** plus die **Vorfristen T-14/7/3/1 als Wiedervorlagen**
+(fällt eine Vorfrist auf Sa/So/Feiertag → vorheriger Werktag). Termin-IDs sind deterministisch,
+wiederholtes Anlegen erzeugt keine Duplikate. Export als **ICS** (Outlook/Google/Kanzleisoftware).
+Domäne: `src/lib/termine.ts`, Persistenz (Demo, nur Browser): `src/lib/kalenderStore.ts`,
+End-to-End-Test Chat → Frist → Termine: `src/lib/termine.test.ts`.
 
 ### Schnellstart (kostenlos, ohne KI-Key)
 
@@ -59,7 +66,7 @@ Browser (React/Vite)  →  /api/chat (Proxy, Key serverseitig)  →  CH-KI (Open
                                          └─ kein Key → lokaler Mock (gratis, offline)
 ```
 
-- `src/` — React-UI (App, ChatWidget, IntakeDashboard, i18n, aiClient)
+- `src/` — React-UI (App, ChatWidget, IntakeDashboard, FristenView, KalenderView, i18n, aiClient)
 - `api/_core.ts` — framework-agnostischer Intake-Kern · `api/chat.ts` — Vercel Function
 - `vite.config.ts` — Dev-Middleware für `/api/chat`
 
@@ -88,7 +95,7 @@ Details: [`avatar/README.md`](avatar/README.md) · Architektur/Plan:
 ## Tests
 
 ```bash
-npm test          # Vitest — Fristen-Engine + API-Kern (18 Fälle)
+npm test          # Vitest — Fristen-Engine, Termine/Kalender, API-Kern (28 Fälle)
 npm run smoke -- <URL>   # Post-Deploy-Smoke-Test (Startseite + /api/chat)
 npm run typecheck
 ```

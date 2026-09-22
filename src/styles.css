@@ -137,3 +137,36 @@ body {
 .steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #334155; }
 .vorfristen { margin: 0; padding-left: 18px; font-size: 13px; color: #334155; }
 .vorfristen li { margin-bottom: 3px; }
+
+/* Frist → Akte / Kalender */
+.tab-count { margin-left: 8px; background: var(--brand); color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 11px; }
+.tab.active .tab-count { background: var(--brand); }
+.akte-box { margin-top: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; background: #f8fafc; }
+.akte-box h4 { margin-top: 0; }
+.akte-box .form { margin-top: 8px; }
+button.primary { background: var(--brand); color: #fff; border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 600; cursor: pointer; }
+.ok-note { margin: 10px 0 0; font-size: 13px; color: var(--ok); background: var(--ok-soft); padding: 8px 10px; border-radius: 8px; }
+.pill-warn { background: var(--warn-soft); color: var(--warn); }
+.agenda { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.agenda-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.agenda-item.frist { border-left: 4px solid var(--brand); }
+.agenda-item.ueberfaellig { border-left-color: var(--warn); background: var(--warn-soft); }
+.agenda-date { font-weight: 700; min-width: 86px; }
+.agenda-body { display: flex; flex-direction: column; flex: 1; }
+.agenda-meta { font-size: 11px; color: var(--muted); }
+.row-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.row-actions .restart { margin-top: 0; }
+.akte { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.akte-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; font-size: 13px; }
+.akte-actions { display: flex; gap: 10px; white-space: nowrap; }
+.link-btn.danger { color: #b91c1c; }
+.frist-gruppe { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.frist-gruppe-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-weight: 600; }
+.termine { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.termin { font-size: 13px; }
+.termin .check { display: flex; align-items: center; gap: 8px; }
+.termin-date { font-weight: 600; min-width: 86px; }
+.termin.frist .termin-title { font-weight: 700; color: var(--brand); }
+.termin.ueberfaellig .termin-date { color: var(--warn); }
+.termin.erledigt .termin-title, .termin.erledigt .termin-date { text-decoration: line-through; color: var(--muted); font-weight: 400; }
+.check.small { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }

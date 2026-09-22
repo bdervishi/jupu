@@ -1,28 +1,22 @@
 import { useMemo, useState } from 'react';
 import { ChatWidget } from './components/ChatWidget';
 import { IntakeDashboard } from './components/IntakeDashboard';
-import { FristenView } from './components/FristenView';
+import { FristenView, type FristenPrefill } from './components/FristenView';
+import { KalenderView } from './components/KalenderView';
 import { sendIntake } from './lib/aiClient';
 import { detectLang, t } from './lib/i18n';
+import { useKalender } from './lib/useKalender';
+import { deDateToIso } from './lib/termine';
 import { emptyExtracted, type ChatMessage, type IntakeExtracted, type Lang } from './types';
 
 const LANGS: Lang[] = ['de', 'fr', 'it'];
 
-type Tab = 'intake' | 'fristen';
-
-// Wandelt ein erkanntes Frist-Datum (z. B. "30.09.2026" / "30/9/26") in ISO um.
-function deDateToIso(s: string): string | null {
-  const m = s.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
-  if (!m) return null;
-  const d = m[1].padStart(2, '0');
-  const mo = m[2].padStart(2, '0');
-  const y = m[3].length === 2 ? `20${m[3]}` : m[3];
-  return `${y}-${mo}-${d}`;
-}
+type Tab = 'intake' | 'fristen' | 'kalender';
 
 export function App() {
   const [tab, setTab] = useState<Tab>('intake');
-  const [fristenPrefill, setFristenPrefill] = useState<string | undefined>(undefined);
+  const [fristenPrefill, setFristenPrefill] = useState<FristenPrefill | undefined>(undefined);
+  const kalender = useKalender();
   const [lang, setLang] = useState<Lang>('de');
   const [langLocked, setLangLocked] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -70,7 +64,10 @@ export function App() {
 
   function handleOpenFrist(datumDe: string) {
     const iso = deDateToIso(datumDe);
-    if (iso) setFristenPrefill(iso);
+    // Akten-Vorschlag aus dem Intake (Gegenpartei / Rechtsgebiet), damit der Flow
+    // Chat → Frist → Termine ohne Abtippen durchläuft.
+    const akteVorschlag = [extracted.parteien, extracted.rechtsgebiet].filter(Boolean).join(' · ');
+    setFristenPrefill({ datum: iso ?? undefined, akteVorschlag: akteVorschlag || undefined });
     setTab('fristen');
   }
 
@@ -112,6 +109,9 @@ export function App() {
       <nav className="tabs">
         <button className={tab === 'intake' ? 'tab active' : 'tab'} onClick={() => setTab('intake')}>{ui.tabIntake}</button>
         <button className={tab === 'fristen' ? 'tab active' : 'tab'} onClick={() => setTab('fristen')}>{ui.tabFristen}</button>
+        <button className={tab === 'kalender' ? 'tab active' : 'tab'} onClick={() => setTab('kalender')}>
+          {ui.tabKalender}{kalender.offen > 0 && <span className="tab-count">{kalender.offen}</span>}
+        </button>
       </nav>
 
       {tab === 'intake' && <div className="banner">{ui.demoBanner}</div>}
@@ -136,8 +136,17 @@ export function App() {
             <button className="restart" onClick={handleRestart}>{ui.restart}</button>
           </section>
         </main>
+      ) : tab === 'fristen' ? (
+        <main>
+          <FristenView
+            prefill={fristenPrefill}
+            akten={kalender.state.akten}
+            onAnlegen={(termine, akte) => kalender.termineAnlegen(termine, akte)}
+            onOpenKalender={() => setTab('kalender')}
+          />
+        </main>
       ) : (
-        <main><FristenView prefillDate={fristenPrefill} /></main>
+        <main><KalenderView kalender={kalender} /></main>
       )}
     </div>
   );
